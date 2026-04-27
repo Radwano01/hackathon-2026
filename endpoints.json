@@ -1,0 +1,282 @@
+{
+  "baseUrl": "https://api.smartfuel.com/v1",
+  "authentication": {
+    "register": {
+      "method": "POST",
+      "endpoint": "/auth/register",
+      "request": {
+        "fullName": "John Doe",
+        "phone": "+905551112233",
+        "email": "john@email.com",
+        "password": "123456"
+      },
+      "response": {
+        "userId": "u_12345",
+        "token": "jwt_token",
+        "message": "User registered successfully"
+      }
+    },
+    "login": {
+      "method": "POST",
+      "endpoint": "/auth/login",
+      "request": {
+        "phone": "+905551112233",
+        "password": "123456"
+      },
+      "response": {
+        "userId": "u_12345",
+        "token": "jwt_token"
+      }
+    },
+    "me": {
+      "method": "GET",
+      "endpoint": "/auth/me",
+      "headers": {
+        "Authorization": "Bearer <token>"
+      },
+      "response": {
+        "userId": "u_12345",
+        "fullName": "John Doe",
+        "phone": "+905551112233"
+      }
+    }
+  },
+  "users": {
+    "updateProfile": {
+      "method": "PUT",
+      "endpoint": "/users",
+      "request": {
+        "fullName": "John Updated",
+        "email": "new@email.com"
+      },
+      "response": {
+        "message": "Profile updated successfully"
+      }
+    },
+    "changePassword": {
+      "method": "PUT",
+      "endpoint": "/users/password",
+      "request": {
+        "oldPassword": "123456",
+        "newPassword": "654321"
+      },
+      "response": {
+        "message": "Password updated"
+      }
+    }
+  },
+  "vehicles": {
+    "add": {
+      "method": "POST",
+      "endpoint": "/vehicles",
+      "request": {
+        "plateNumber": "34ABC123",
+        "model": "Tesla Model 3",
+        "fuelType": "electric"
+      },
+      "response": {
+        "vehicleId": "v_123",
+        "message": "Vehicle added successfully"
+      }
+    },
+    "list": {
+      "method": "GET",
+      "endpoint": "/vehicles",
+      "response": [
+        {
+          "vehicleId": "v_123",
+          "plateNumber": "34ABC123",
+          "model": "Tesla Model 3"
+        }
+      ]
+    },
+    "select": {
+      "method": "POST",
+      "endpoint": "/vehicles/select",
+      "request": {
+        "vehicleId": "v_123"
+      },
+      "response": {
+        "message": "Active vehicle updated"
+      }
+    }
+  },
+  "fuel": {
+    "start": {
+      "method": "POST",
+      "endpoint": "/fuel/start",
+      "request": {
+        "vehicleId": "v_123",
+        "stationId": "st_001",
+        "fuelType": "premium"
+      },
+      "response": {
+        "sessionId": "fs_001",
+        "status": "started"
+      }
+    },
+    "stop": {
+      "method": "POST",
+      "endpoint": "/fuel/stop",
+      "request": {
+        "sessionId": "fs_001",
+        "liters": 35.2,
+        "totalCost": 52.8
+      },
+      "response": {
+        "status": "completed",
+        "transactionId": "tx_789"
+      }
+    },
+    "history": {
+      "method": "GET",
+      "endpoint": "/fuel/history",
+      "response": [
+        {
+          "sessionId": "fs_001",
+          "liters": 35.2,
+          "cost": 52.8
+        }
+      ]
+    }
+  },
+  "wallet": {
+    "balance": {
+      "method": "GET",
+      "endpoint": "/wallet/balance",
+      "response": {
+        "balance": 1250.75,
+        "currency": "USD"
+      }
+    },
+    "topup": {
+      "method": "POST",
+      "endpoint": "/wallet/topup",
+      "request": {
+        "amount": 100,
+        "paymentMethod": "card"
+      },
+      "response": {
+        "status": "success",
+        "newBalance": 1350.75
+      }
+    },
+    "pay": {
+      "method": "POST",
+      "endpoint": "/wallet/pay",
+      "request": {
+        "amount": 45.5,
+        "stationId": "st_001",
+        "fuelType": "premium",
+        "liters": 30
+      },
+      "response": {
+        "status": "paid",
+        "transactionId": "tx_789",
+        "remainingBalance": 1305.25
+      }
+    },
+    "transactions": {
+      "method": "GET",
+      "endpoint": "/wallet/transactions",
+      "response": [
+        {
+          "id": "tx_1",
+          "amount": 45.5,
+          "type": "fuel"
+        }
+      ]
+    }
+  },
+  "ai": {
+    "detect": {
+      "method": "POST",
+      "endpoint": "/ai/detect",
+      "request": {
+        "imageBase64": "data:image/jpeg;base64,..."
+      },
+      "response": {
+        "plateNumber": "34ABC123",
+        "confidence": 0.98,
+        "matched": true
+      }
+    },
+    "verify": {
+      "method": "POST",
+      "endpoint": "/ai/verify",
+      "request": {
+        "plateNumber": "34ABC123",
+        "stationId": "st_001"
+      },
+      "response": {
+        "verified": true,
+        "userId": "u_123"
+      }
+    }
+  },
+  "stations": {
+    "list": {
+      "method": "GET",
+      "endpoint": "/stations",
+      "response": [
+        {
+          "stationId": "st_001",
+          "name": "Shell Station",
+          "price": 1.85
+        }
+      ]
+    },
+    "nearby": {
+      "method": "GET",
+      "endpoint": "/stations/nearby?lat=40.1&lng=29.0",
+      "response": []
+    }
+  },
+  "rewards": {
+    "get": {
+      "method": "GET",
+      "endpoint": "/rewards",
+      "response": {
+        "points": 320
+      }
+    },
+    "earn": {
+      "method": "POST",
+      "endpoint": "/rewards/earn",
+      "request": {
+        "userId": "u_123",
+        "liters": 30,
+        "amount": 45.5
+      },
+      "response": {
+        "pointsEarned": 45,
+        "totalPoints": 320
+      }
+    }
+  },
+  "analytics": {
+    "user": {
+      "method": "GET",
+      "endpoint": "/analytics/user",
+      "response": {
+        "totalSpent": 500,
+        "totalLiters": 320,
+        "monthlyUsage": [50, 60, 70]
+      }
+    }
+  },
+  "system": {
+    "status": {
+      "method": "GET",
+      "endpoint": "/system/status",
+      "response": {
+        "status": "ok"
+      }
+    },
+    "logs": {
+      "method": "GET",
+      "endpoint": "/system/logs",
+      "response": []
+    }
+  }
+}
