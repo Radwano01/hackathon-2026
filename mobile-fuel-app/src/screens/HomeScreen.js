@@ -67,28 +67,42 @@ export default function HomeScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadDashboard} />}
     >
-      <Text style={styles.greeting}>Welcome, {user?.name || 'User'}</Text>
+      <View style={styles.hero}>
+        <Text style={styles.heroKicker}>CIRCLE K EXTRA</Text>
+        <Text style={styles.heroTitle}>Welcome, {user?.name || 'User'}</Text>
+        <Text style={styles.heroText}>Manage fuel, cards, cars and your profile from one place.</Text>
+      </View>
 
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Current Balance</Text>
         <Text style={styles.balanceValue}>${balance.toFixed(2)}</Text>
+        <Text style={styles.balanceCaption}>Available for fuel and payments</Text>
       </View>
 
       <View style={styles.row}>
         <Pressable style={styles.summaryCard} onPress={() => navigation.navigate('Cards')}>
           <Text style={styles.summaryLabel}>Cards</Text>
           <Text style={styles.summaryValue}>{cards.length}</Text>
+          <Text style={styles.summaryHint}>{cards.filter((card) => card.active).length} active</Text>
         </Pressable>
 
         <Pressable style={styles.summaryCard} onPress={() => navigation.navigate('Cars')}>
           <Text style={styles.summaryLabel}>Cars</Text>
           <Text style={styles.summaryValue}>{cars.length}</Text>
+          <Text style={styles.summaryHint}>{cars.filter((car) => car.active).length} active</Text>
         </Pressable>
       </View>
 
-      <Pressable style={styles.transactionsShortcut} onPress={() => navigation.navigate('Transactions')}>
-        <Text style={styles.shortcutText}>View All Transactions</Text>
-      </Pressable>
+      <View style={styles.quickGrid}>
+        <Pressable style={styles.quickButton} onPress={() => navigation.navigate('Transactions')}>
+          <Text style={styles.quickButtonTitle}>Transactions</Text>
+          <Text style={styles.quickButtonText}>See payment history</Text>
+        </Pressable>
+        <Pressable style={styles.quickButton} onPress={() => navigation.navigate('Profile')}>
+          <Text style={styles.quickButtonTitle}>Profile</Text>
+          <Text style={styles.quickButtonText}>Edit account details</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.sectionTitle}>Recent Transactions</Text>
       {transactions.slice(0, 3).map((item, index) => (
@@ -106,33 +120,57 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f7f7f7',
   },
   content: {
     padding: 16,
     paddingBottom: 24,
   },
-  greeting: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 12,
+  hero: {
+    backgroundColor: '#e30613',
+    borderRadius: 28,
+    padding: 20,
+    marginBottom: 16,
+  },
+  heroKicker: {
+    color: '#ffd5d8',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  heroTitle: {
+    marginTop: 8,
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  heroText: {
+    marginTop: 8,
+    color: '#ffecec',
+    lineHeight: 20,
   },
   balanceCard: {
-    backgroundColor: '#111827',
-    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
     padding: 18,
     marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#fee2e2',
   },
   balanceLabel: {
-    color: '#9ca3af',
+    color: '#6b7280',
     fontSize: 13,
+    fontWeight: '700',
   },
   balanceValue: {
     marginTop: 8,
-    color: '#ffffff',
+    color: '#111827',
     fontSize: 30,
     fontWeight: '800',
+  },
+  balanceCaption: {
+    marginTop: 8,
+    color: '#6b7280',
   },
   row: {
     flexDirection: 'row',
@@ -142,14 +180,14 @@ const styles = StyleSheet.create({
   summaryCard: {
     flex: 1,
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#fee2e2',
     padding: 14,
   },
   summaryLabel: {
-    color: '#6b7280',
-    fontWeight: '600',
+    color: '#e30613',
+    fontWeight: '800',
   },
   summaryValue: {
     marginTop: 8,
@@ -157,22 +195,36 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#111827',
   },
-  transactionsShortcut: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
+  summaryHint: {
+    marginTop: 6,
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  quickGrid: {
+    flexDirection: 'row',
+    gap: 10,
     marginBottom: 16,
   },
-  shortcutText: {
-    fontWeight: '700',
-    color: '#111827',
+  quickButton: {
+    flex: 1,
+    backgroundColor: '#fff1f2',
+    borderRadius: 24,
+    padding: 16,
+  },
+  quickButtonTitle: {
+    color: '#b91c1c',
+    fontWeight: '900',
+    fontSize: 16,
+  },
+  quickButtonText: {
+    marginTop: 6,
+    color: '#6b7280',
+    fontSize: 12,
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '800',
     marginBottom: 10,
     color: '#111827',
   },

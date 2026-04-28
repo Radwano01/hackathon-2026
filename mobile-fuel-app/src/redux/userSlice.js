@@ -17,6 +17,12 @@ const userSlice = createSlice({
       state.token = token || null;
       state.isAuthenticated = Boolean(token);
     },
+    updateUserProfile: (state, action) => {
+      state.user = {
+        ...(state.user || {}),
+        ...(action.payload || {}),
+      };
+    },
     hydrateSession: (state, action) => {
       const { user, token } = action.payload || {};
       state.user = user || null;
@@ -36,5 +42,5 @@ const userSlice = createSlice({
   },
 });
 
-export const { setCredentials, hydrateSession, markHydrated, logout } = userSlice.actions;
+export const { setCredentials, updateUserProfile, hydrateSession, markHydrated, logout } = userSlice.actions;
 export default userSlice.reducer;
