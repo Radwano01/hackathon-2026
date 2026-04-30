@@ -1,246 +1,537 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import store from '../redux/store';
+import { clearFinance } from '../redux/financeSlice';
+import { logout } from '../redux/userSlice';
 
-const DEMO_USERS_KEY = 'demo_users';
-const DEMO_PROFILE_KEY = 'demo_profile';
-const DEMO_CARDS_KEY = 'demo_cards';
-const DEMO_CARS_KEY = 'demo_cars';
-const DEMO_MODE_ENABLED = true;
+const DEFAULT_API_BASE_URL = 'http://YOUR_BACKEND_URL';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
 
+const hasConfiguredBaseUrl =
+  Boolean(API_BASE_URL) &&
+  !String(API_BASE_URL).includes('YOUR_BACKEND_URL') &&
+  !String(API_BASE_URL).includes('api.smartfuel.com');
+
+const DEMO_MODE_ENABLED =
+  process.env.EXPO_PUBLIC_DEMO_MODE === 'true' || !hasConfiguredBaseUrl;
+
+const DEMO_STATE_KEY = 'demo_state_v1';
 const DEMO_SEED_USER = {
   id: 'demo-user-1',
-  name: 'Demo User',
-  email: 'demo@fuel.com',
-  phone: '+47 900 00 000',
-  password: '12345678',
+  userId: 'demo-user-1',
+  fullName: 'Demo Driver',
+  phone: '+971500000001',
+  email: 'demo@fuel.app',
+  password: '123456',
 };
 
-const DEMO_SEED_PROFILE = {
-  name: 'Demo User',
-  email: 'demo@fuel.com',
-  phone: '+47 900 00 000',
-  password: '12345678',
-};
-
-const DEMO_SEED_CARDS = [
-  {
-    id: 'card_1',
-    brand: 'Circle K EXTRA',
-    cardNumber: '4111111111111234',
-    expiryDate: '10/28',
-    active: true,
+const DEMO_SEED_STATE = {
+  users: [DEMO_SEED_USER],
+  walletsByUser: {
+    'demo-user-1': {
+      walletId: 'wallet-demo-1',
+      balance: 1250.75,
+      currency: 'USD',
+    },
   },
-  {
-    id: 'card_2',
-    brand: 'Visa',
-    cardNumber: '5555444433339876',
-    expiryDate: '07/29',
-    active: false,
+  vehiclesByUser: {
+    'demo-user-1': [
+      {
+        id: 'vehicle-demo-1',
+        vehicleId: 'vehicle-demo-1',
+        model: 'Tesla Model 3',
+        plateNumber: '34ABC123',
+        fuelType: 'electric',
+        active: true,
+      },
+    ],
   },
-];
-
-const DEMO_SEED_CARS = [
-  {
-    id: 'car_1',
-    model: 'Tesla Model 3',
-    plateNumber: '34ABC123',
-    active: true,
+  transactionsByUser: {
+    'demo-user-1': [
+      {
+        id: 'tx-demo-1',
+        transactionId: 'tx-demo-1',
+        amount: -45.5,
+        description: 'Fuel Payment - Demo Station',
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'tx-demo-2',
+        transactionId: 'tx-demo-2',
+        amount: 120,
+        description: 'Wallet Top-up',
+        status: 'completed',
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+      },
+    ],
   },
-  {
-    id: 'car_2',
-    model: 'Toyota Corolla',
-    plateNumber: '06XYZ789',
-    active: false,
+  sessionsByUser: {
+    'demo-user-1': [],
   },
-];
-
-const DEMO_DATA = {
-  balance: { balance: 1250.75 },
-  transactions: [
-    { id: 'tx_1', description: 'Fuel Payment - Shell', amount: -45.5, date: '2026-04-26T09:30:00.000Z' },
-    { id: 'tx_2', description: 'Wallet Top-up', amount: 120, date: '2026-04-25T15:10:00.000Z' },
-    { id: 'tx_3', description: 'Fuel Payment - BP', amount: -38.25, date: '2026-04-22T11:50:00.000Z' },
+  stations: [
+    {
+      id: 'station-demo-1',
+      stationId: 'station-demo-1',
+      name: 'Demo Station Downtown',
+      city: 'Dubai',
+      price: 3.05,
+    },
+    {
+      id: 'station-demo-2',
+      stationId: 'station-demo-2',
+      name: 'Demo Station Marina',
+      city: 'Dubai',
+      price: 3.15,
+    },
   ],
-  cards: DEMO_SEED_CARDS,
-  cars: DEMO_SEED_CARS,
 };
 
-const buildDemoToken = (email) => `demo-token-${email}-${Date.now()}`;
+const getApiConfigurationMessage = () =>
+  'Backend URL is not configured. Set EXPO_PUBLIC_API_BASE_URL (for example: http://localhost:8080/v1), then restart Expo.';
 
-const safeParse = (value, fallback) => {
-  try {
-    return value ? JSON.parse(value) : fallback;
-  } catch (error) {
-    return fallback;
-  }
-};
+const clone = (value) => JSON.parse(JSON.stringify(value));
 
-const getDemoUsers = async () => {
-  const raw = await AsyncStorage.getItem(DEMO_USERS_KEY);
-  const parsed = safeParse(raw, []);
-  const list = Array.isArray(parsed) ? parsed : [];
-
-  if (!list.some((user) => user.email?.toLowerCase() === DEMO_SEED_USER.email.toLowerCase())) {
-    const seeded = [...list, DEMO_SEED_USER];
-    await AsyncStorage.setItem(DEMO_USERS_KEY, JSON.stringify(seeded));
+const readDemoState = async () => {
+  const raw = await AsyncStorage.getItem(DEMO_STATE_KEY);
+  if (!raw) {
+    const seeded = clone(DEMO_SEED_STATE);
+    await AsyncStorage.setItem(DEMO_STATE_KEY, JSON.stringify(seeded));
     return seeded;
   }
 
-  return list;
-};
-
-const saveDemoUsers = async (users) => {
-  await AsyncStorage.setItem(DEMO_USERS_KEY, JSON.stringify(users));
-};
-
-const getStoredJson = async (key, fallback) => {
-  const raw = await AsyncStorage.getItem(key);
-  const parsed = safeParse(raw, fallback);
-  return Array.isArray(fallback) ? (Array.isArray(parsed) ? parsed : fallback) : { ...fallback, ...(parsed || {}) };
-};
-
-const setStoredJson = async (key, value) => {
-  await AsyncStorage.setItem(key, JSON.stringify(value));
-};
-
-export const getDemoProfile = async () => {
-  const storedProfile = await AsyncStorage.getItem(DEMO_PROFILE_KEY);
-  if (storedProfile) {
-    const parsedProfile = safeParse(storedProfile, DEMO_SEED_PROFILE);
-    if (parsedProfile?.name && parsedProfile?.email) {
-      return parsedProfile;
-    }
-  }
-
-  const storedUser = safeParse(await AsyncStorage.getItem('user'), null);
-  const fallbackProfile = {
-    ...DEMO_SEED_PROFILE,
-    ...(storedUser || {}),
-  };
-
-  await setStoredJson(DEMO_PROFILE_KEY, fallbackProfile);
-  return fallbackProfile;
-};
-
-export const saveDemoProfile = async (profile) => {
-  const nextProfile = {
-    ...DEMO_SEED_PROFILE,
-    ...(profile || {}),
-  };
-
-  await setStoredJson(DEMO_PROFILE_KEY, nextProfile);
-  await AsyncStorage.setItem(
-    'user',
-    JSON.stringify({
-      id: 'demo-user-1',
-      name: nextProfile.name,
-      email: nextProfile.email,
-      phone: nextProfile.phone,
-    })
-  );
-
-  return nextProfile;
-};
-
-export const updateDemoProfile = async (updates) => {
-  const currentProfile = await getDemoProfile();
-  const nextProfile = {
-    ...currentProfile,
-    ...updates,
-  };
-
-  const users = await getDemoUsers();
-  const normalizedOldEmail = String(currentProfile.email || '').toLowerCase();
-  const normalizedNewEmail = String(nextProfile.email || '').toLowerCase();
-  const matchingIndex = users.findIndex((user) => user.email?.toLowerCase() === normalizedOldEmail);
-
-  if (
-    normalizedNewEmail &&
-    normalizedNewEmail !== normalizedOldEmail &&
-    users.some((user) => user.email?.toLowerCase() === normalizedNewEmail)
-  ) {
-    throw {
-      message: 'Email already exists.',
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      ...clone(DEMO_SEED_STATE),
+      ...(parsed || {}),
     };
+  } catch (error) {
+    const seeded = clone(DEMO_SEED_STATE);
+    await AsyncStorage.setItem(DEMO_STATE_KEY, JSON.stringify(seeded));
+    return seeded;
+  }
+};
+
+const writeDemoState = async (state) => {
+  await AsyncStorage.setItem(DEMO_STATE_KEY, JSON.stringify(state));
+};
+
+const getStoredUser = async () => {
+  const raw = await AsyncStorage.getItem('user');
+  if (!raw) {
+    return null;
   }
 
-  if (matchingIndex >= 0) {
-    const existing = users[matchingIndex];
-    const updatedUser = {
-      ...existing,
-      name: nextProfile.name,
-      phone: nextProfile.phone,
-      email: nextProfile.email,
-      password: nextProfile.password || existing.password,
-    };
-
-    const nextUsers = [...users];
-    nextUsers[matchingIndex] = updatedUser;
-
-    if (normalizedNewEmail !== normalizedOldEmail && !nextUsers.some((user) => user.email?.toLowerCase() === normalizedNewEmail && user.id !== existing.id)) {
-      await saveDemoUsers(nextUsers);
-    } else {
-      await saveDemoUsers(nextUsers);
-    }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
   }
-
-  await saveDemoProfile(nextProfile);
-
-  return nextProfile;
 };
 
-export const getDemoCards = async () => {
-  const cards = await getStoredJson(DEMO_CARDS_KEY, DEMO_SEED_CARDS);
-  if (!Array.isArray(cards) || cards.length === 0) {
-    await setStoredJson(DEMO_CARDS_KEY, DEMO_SEED_CARDS);
-    return DEMO_SEED_CARDS;
-  }
-  return cards;
+const getActiveDemoUser = async (state) => {
+  const storedUser = await getStoredUser();
+  const activeId = storedUser?.id || storedUser?.userId;
+  const found = state.users.find((user) => user.id === activeId || user.userId === activeId);
+  return found || state.users[0] || DEMO_SEED_USER;
 };
 
-export const saveDemoCards = async (cards) => {
-  const nextCards = Array.isArray(cards) ? cards : DEMO_SEED_CARDS;
-  await setStoredJson(DEMO_CARDS_KEY, nextCards);
-  return nextCards;
-};
-
-export const getDemoCars = async () => {
-  const cars = await getStoredJson(DEMO_CARS_KEY, DEMO_SEED_CARS);
-  if (!Array.isArray(cars) || cars.length === 0) {
-    await setStoredJson(DEMO_CARS_KEY, DEMO_SEED_CARS);
-    return DEMO_SEED_CARS;
-  }
-  return cars;
-};
-
-export const saveDemoCars = async (cars) => {
-  const nextCars = Array.isArray(cars) ? cars : DEMO_SEED_CARS;
-  await setStoredJson(DEMO_CARS_KEY, nextCars);
-  return nextCars;
-};
+const createDemoToken = (userId) => `demo-token-${userId}`;
 
 const shouldUseDemoFallback = (error) => {
   if (!DEMO_MODE_ENABLED) {
     return false;
   }
 
-  // Fallback only when server is unreachable/timeouts/5xx.
-  const status = error?.status || error?.response?.status;
-  return !status || status >= 500;
+  if (!hasConfiguredBaseUrl) {
+    return true;
+  }
+
+  if (!error?.status) {
+    return true;
+  }
+
+  return false;
+};
+
+const demoLogin = async (payload) => {
+  const state = await readDemoState();
+  const phone = String(payload?.phone || '').trim();
+  const password = String(payload?.password || '');
+
+  const found = state.users.find((user) => user.phone === phone);
+  if (!found || String(found.password || '') !== password) {
+    throw {
+      message: 'Invalid phone number or password.',
+    };
+  }
+
+  return {
+    token: createDemoToken(found.id),
+    userId: found.id,
+    user: normalizeUser(found),
+  };
+};
+
+const demoRegister = async (payload) => {
+  const state = await readDemoState();
+  const fullName = String(payload?.fullName || '').trim();
+  const phoneNumber = String(payload?.phoneNumber || '').trim();
+  const email = String(payload?.email || '').trim().toLowerCase();
+  const password = String(payload?.password || '');
+
+  if (state.users.some((user) => user.phone === phoneNumber)) {
+    throw {
+      message: 'Phone number already exists.',
+    };
+  }
+
+  const nextId = `demo-user-${Date.now()}`;
+  const newUser = {
+    id: nextId,
+    userId: nextId,
+    fullName,
+    phone: phoneNumber,
+    email,
+    password,
+  };
+
+  state.users = [...state.users, newUser];
+  state.walletsByUser[nextId] = {
+    walletId: `wallet-${nextId}`,
+    balance: 500,
+    currency: 'USD',
+  };
+  state.vehiclesByUser[nextId] = [];
+  state.transactionsByUser[nextId] = [];
+  state.sessionsByUser[nextId] = [];
+
+  await writeDemoState(state);
+
+  return {
+    token: createDemoToken(nextId),
+    userId: nextId,
+    user: normalizeUser(newUser),
+    message: 'Demo account created successfully.',
+  };
+};
+
+const demoGetCurrentUser = async () => {
+  const state = await readDemoState();
+  return normalizeUser(await getActiveDemoUser(state));
+};
+
+const demoGetWallet = async () => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+  return normalizeWallet(state.walletsByUser[active.id] || { balance: 0, currency: 'USD' });
+};
+
+const demoGetTransactions = async () => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+  const transactions = state.transactionsByUser[active.id] || [];
+  return {
+    transactions: transactions.map(normalizeTransaction),
+  };
+};
+
+const demoGetVehicles = async () => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+  const vehicles = state.vehiclesByUser[active.id] || [];
+  return {
+    vehicles: vehicles.map(normalizeVehicle),
+    cars: vehicles.map(normalizeVehicle),
+  };
+};
+
+const demoAddVehicle = async (payload) => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+  const current = state.vehiclesByUser[active.id] || [];
+
+  const nextVehicle = normalizeVehicle({
+    id: `vehicle-${Date.now()}`,
+    model: payload?.model,
+    plateNumber: payload?.plateNumber,
+    fuelType: payload?.fuelType,
+    active: current.length === 0,
+  });
+
+  state.vehiclesByUser[active.id] = [nextVehicle, ...current];
+  await writeDemoState(state);
+  return nextVehicle;
+};
+
+const demoUpdateVehicle = async (vehicleId, payload) => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+  const current = state.vehiclesByUser[active.id] || [];
+
+  state.vehiclesByUser[active.id] = current.map((vehicle) =>
+    String(vehicle.id || vehicle.vehicleId) === String(vehicleId)
+      ? normalizeVehicle({ ...vehicle, ...(payload || {}) })
+      : vehicle
+  );
+
+  await writeDemoState(state);
+  return { message: 'Vehicle updated' };
+};
+
+const demoDeactivateVehicle = async (vehicleId) => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+  const current = state.vehiclesByUser[active.id] || [];
+
+  state.vehiclesByUser[active.id] = current.map((vehicle) =>
+    String(vehicle.id || vehicle.vehicleId) === String(vehicleId)
+      ? normalizeVehicle({ ...vehicle, active: false, status: 'inactive' })
+      : vehicle
+  );
+
+  await writeDemoState(state);
+  return { message: 'Vehicle deactivated' };
+};
+
+const demoGetStations = async () => {
+  const state = await readDemoState();
+  return {
+    stations: (state.stations || []).map(normalizeStation),
+  };
+};
+
+const demoStartSession = async (payload) => {
+  const state = await readDemoState();
+  const userId = payload?.userId;
+  const sessionId = `session-${Date.now()}`;
+  const userSessions = state.sessionsByUser[userId] || [];
+  const startedAt = new Date().toISOString();
+
+  const nextSession = normalizeSession({
+    id: sessionId,
+    sessionId,
+    userId,
+    vehicleId: payload?.vehicleId,
+    stationId: payload?.stationId,
+    fuelType: payload?.fuelType || 'premium',
+    status: 'started',
+    startedAt,
+    createdAt: startedAt,
+  });
+
+  state.sessionsByUser[userId] = [nextSession, ...userSessions];
+  await writeDemoState(state);
+  return nextSession;
+};
+
+const demoUpdateSessionStatus = async (sessionId, status) => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+  const userId = active.id;
+  const currentSessions = state.sessionsByUser[userId] || [];
+
+  let updatedSession = null;
+  state.sessionsByUser[userId] = currentSessions.map((session) => {
+    if (String(session.sessionId || session.id) !== String(sessionId)) {
+      return session;
+    }
+
+    updatedSession = normalizeSession({
+      ...session,
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+    return updatedSession;
+  });
+
+  if (status === 'completed' && updatedSession) {
+    const amount = -35.25;
+    const userTransactions = state.transactionsByUser[userId] || [];
+    state.transactionsByUser[userId] = [
+      {
+        id: `tx-${Date.now()}`,
+        transactionId: `tx-${Date.now()}`,
+        amount,
+        description: 'Fuel Session Payment',
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+      },
+      ...userTransactions,
+    ];
+
+    const wallet = state.walletsByUser[userId] || { balance: 0, currency: 'USD' };
+    state.walletsByUser[userId] = {
+      ...wallet,
+      balance: Number(wallet.balance || 0) + amount,
+    };
+  }
+
+  await writeDemoState(state);
+  return updatedSession;
+};
+
+const demoGetUserSessions = async (userId) => {
+  const state = await readDemoState();
+  return {
+    sessions: (state.sessionsByUser[userId] || []).map(normalizeSession),
+  };
+};
+
+const demoGetSession = async (sessionId) => {
+  const state = await readDemoState();
+  const all = Object.values(state.sessionsByUser || {}).flat();
+  const found = all.find((session) => String(session.sessionId || session.id) === String(sessionId));
+  return normalizeSession(found || {});
+};
+
+const demoUpdateUser = async (payload) => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+
+  state.users = state.users.map((user) =>
+    user.id === active.id
+      ? {
+          ...user,
+          fullName: payload?.fullName ?? user.fullName,
+          phone: payload?.phone ?? user.phone,
+          email: payload?.email ?? user.email,
+        }
+      : user
+  );
+
+  await writeDemoState(state);
+  return { message: 'Profile updated successfully' };
+};
+
+const demoUpdatePassword = async (payload) => {
+  const state = await readDemoState();
+  const active = await getActiveDemoUser(state);
+
+  state.users = state.users.map((user) => {
+    if (user.id !== active.id) {
+      return user;
+    }
+
+    if (payload?.oldPassword && String(user.password || '') !== String(payload.oldPassword)) {
+      throw {
+        message: 'Current password is incorrect.',
+      };
+    }
+
+    return {
+      ...user,
+      password: payload?.newPassword || user.password,
+    };
+  });
+
+  await writeDemoState(state);
+  return { message: 'Password updated' };
 };
 
 const api = axios.create({
-  baseURL: 'http://YOUR_BACKEND_URL',
+  baseURL: API_BASE_URL,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+const normalizeUser = (data) => {
+  if (!data) {
+    return null;
+  }
+
+  const source = data.user || data;
+  return {
+    id: source.userId || source.id || null,
+    userId: source.userId || source.id || null,
+    name: source.fullName || source.name || '',
+    fullName: source.fullName || source.name || '',
+    phone: source.phone || source.phoneNumber || '',
+    email: source.email || '',
+  };
+};
+
+const normalizeWallet = (data) => {
+  const source = data?.wallet || data || {};
+  const balance = Number(source.balance ?? source.amount ?? 0) || 0;
+  return {
+    ...source,
+    balance,
+    currency: source.currency || 'USD',
+  };
+};
+
+const normalizeVehicle = (data) => {
+  const source = data?.vehicle || data || {};
+  return {
+    ...source,
+    id: source.vehicleId || source.id || null,
+    vehicleId: source.vehicleId || source.id || null,
+    plateNumber: source.plateNumber || source.plate || '',
+    model: source.model || '',
+    fuelType: source.fuelType || '',
+    active: source.active ?? source.isActive ?? source.status !== 'inactive',
+  };
+};
+
+const normalizeTransaction = (data) => {
+  const source = data?.transaction || data || {};
+  return {
+    ...source,
+    id: source.id || source.transactionId || null,
+    transactionId: source.transactionId || source.id || null,
+    amount: Number(source.amount ?? source.totalAmount ?? 0) || 0,
+  };
+};
+
+const normalizeSession = (data) => {
+  const source = data?.session || data || {};
+  return {
+    ...source,
+    id: source.sessionId || source.id || null,
+    sessionId: source.sessionId || source.id || null,
+  };
+};
+
+const normalizeStation = (data) => {
+  const source = data?.station || data || {};
+  return {
+    ...source,
+    id: source.stationId || source.id || null,
+    stationId: source.stationId || source.id || null,
+  };
+};
+
+const normalizeList = (data, key, mapper) => {
+  if (Array.isArray(data)) {
+    return data.map(mapper);
+  }
+
+  if (Array.isArray(data?.[key])) {
+    return data[key].map(mapper);
+  }
+
+  return [];
+};
+
+const clearSessionStorage = async () => {
+  await AsyncStorage.multiRemove(['token', 'user']);
+};
+
+const handleUnauthorized = () => {
+  void clearSessionStorage();
+  store.dispatch(clearFinance());
+  store.dispatch(logout());
+};
+
 api.interceptors.request.use(
   async (config) => {
     const token = await AsyncStorage.getItem('token');
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -251,135 +542,351 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.message || error.message || 'Something went wrong. Please try again.';
+    const status = error.response?.status;
+    const message = error.response?.data?.message
+      || (!error.response
+        ? `Cannot reach backend at ${API_BASE_URL}. Set EXPO_PUBLIC_API_BASE_URL and restart Expo.`
+        : error.message)
+      || 'Something went wrong. Please try again.';
+
+    if (status === 401) {
+      handleUnauthorized();
+    }
 
     return Promise.reject({
       message,
-      status: error.response?.status,
+      status,
       data: error.response?.data,
     });
   }
 );
 
-export const loginRequest = async (payload) => {
-  try {
-    const response = await api.post('/login', payload);
-    return response.data;
-  } catch (error) {
-    if (!shouldUseDemoFallback(error)) {
-      throw error;
-    }
-
-    const users = await getDemoUsers();
-    const email = String(payload?.email || '').trim().toLowerCase();
-    const password = String(payload?.password || '');
-    const foundUser = users.find((user) => user.email?.toLowerCase() === email);
-
-    if (!foundUser || foundUser.password !== password) {
-      throw {
-        message: 'Invalid email or password.',
-      };
-    }
-
-    return {
-      token: buildDemoToken(foundUser.email),
-      user: {
-        id: foundUser.id,
-        name: foundUser.name,
-        email: foundUser.email,
-        phone: foundUser.phone || DEMO_SEED_PROFILE.phone,
-      },
+const request = async (method, url, data, config = {}) => {
+  if (!hasConfiguredBaseUrl) {
+    throw {
+      message: getApiConfigurationMessage(),
+      status: 0,
+      data: null,
     };
   }
+
+  const response = await api.request({
+    method,
+    url,
+    data,
+    ...config,
+  });
+  return response.data;
+};
+
+export const authApi = {
+  login: (payload) => request('post', '/auth/login', payload),
+  register: (payload) => request('post', '/auth/register', payload),
+  validate: (token) => request('get', '/auth/validate', undefined, { headers: { Authorization: `Bearer ${token}` } }),
+  me: () => request('get', '/auth/me'),
+};
+
+export const userApi = {
+  register: (payload) => request('post', '/users/register', payload),
+  login: (payload) => request('post', '/users/login', payload),
+  getUser: (userId) => request('get', `/users/${encodeURIComponent(userId)}`),
+  updateUser: (payload) => request('put', '/users', payload),
+  updatePassword: (payload) => request('put', '/users/password', payload),
+  passwordResetRequest: (payload) => request('post', '/users/password-reset/request', payload),
+  passwordReset: (payload) => request('post', '/users/password-reset', payload),
+};
+
+export const walletApi = {
+  createWallet: (payload) => request('post', '/wallet', payload),
+  getWallet: () => request('get', '/wallet/balance'),
+  updateWallet: (payload) => request('put', '/wallet', payload),
+  deactivateWallet: (walletId) => request('post', `/wallet/${encodeURIComponent(walletId)}/deactivate`),
+  bonusWallet: (payload) => request('post', '/wallet/bonus', payload),
+};
+
+export const vehicleApi = {
+  addVehicle: (payload) => request('post', '/vehicles', payload),
+  getVehicles: () => request('get', '/vehicles'),
+  getVehicleById: (vehicleId) => request('get', `/vehicles/${encodeURIComponent(vehicleId)}`),
+  updateVehicle: (vehicleId, payload) => request('put', `/vehicles/${encodeURIComponent(vehicleId)}`, payload),
+  deactivateVehicle: (vehicleId) => request('post', `/vehicles/${encodeURIComponent(vehicleId)}/deactivate`),
+};
+
+export const stationApi = {
+  getStations: () => request('get', '/stations'),
+  getStationById: (stationId) => request('get', `/stations/${encodeURIComponent(stationId)}`),
+  getStationsByCity: (city) => request('get', '/stations', undefined, { params: { city } }),
+  getStationPrices: (stationId) => request('get', `/stations/${encodeURIComponent(stationId)}/prices`),
+};
+
+export const transactionApi = {
+  createTransaction: (payload) => request('post', '/transactions', payload),
+  updateTransactionStatus: (transactionId, payload) =>
+    request('patch', `/transactions/${encodeURIComponent(transactionId)}/status`, payload),
+  getTransactions: () => request('get', '/transactions'),
+  getTransactionById: (transactionId) => request('get', `/transactions/${encodeURIComponent(transactionId)}`),
+};
+
+export const fuelSessionApi = {
+  startSession: ({ userId, vehicleId, stationId, ...payload }) =>
+    request('post', `/fuel-sessions/users/${encodeURIComponent(userId)}/vehicles/${encodeURIComponent(vehicleId)}/stations/${encodeURIComponent(stationId)}/start`, payload),
+  stopSession: (sessionId, payload) =>
+    request('post', `/fuel-sessions/${encodeURIComponent(sessionId)}/stop`, payload),
+  cancelSession: (sessionId, payload) =>
+    request('post', `/fuel-sessions/${encodeURIComponent(sessionId)}/cancel`, payload),
+  getSession: (sessionId) => request('get', `/fuel-sessions/${encodeURIComponent(sessionId)}`),
+  getUserSessions: (userId) => request('get', `/fuel-sessions/users/${encodeURIComponent(userId)}`),
+};
+
+export const passwordResetTokenApi = {
+  createToken: (payload) => request('post', '/password-reset-token', payload),
+  validateToken: (payload) => request('post', '/password-reset-token/validate', payload),
 };
 
 export const registerRequest = async (payload) => {
   try {
-    const response = await api.post('/register', payload);
-    return response.data;
+    return await authApi.register(payload);
   } catch (error) {
     if (!shouldUseDemoFallback(error)) {
       throw error;
     }
 
-    const users = await getDemoUsers();
-    const email = String(payload?.email || '').trim().toLowerCase();
-
-    if (users.some((user) => user.email?.toLowerCase() === email)) {
-      throw {
-        message: 'Email already exists.',
-      };
-    }
-
-    const newUser = {
-      id: `demo-user-${Date.now()}`,
-      name: String(payload?.name || '').trim() || 'User',
-      email,
-      phone: String(payload?.phone || '').trim() || DEMO_SEED_PROFILE.phone,
-      password: String(payload?.password || ''),
-    };
-
-    await saveDemoUsers([...users, newUser]);
-
-    return {
-      message: 'User registered successfully',
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-      },
-    };
+    return demoRegister(payload);
   }
 };
 
-export const getBalanceRequest = async () => {
+export const loginRequest = async (payload) => {
   try {
-    const response = await api.get('/balance');
-    return response.data;
+    return await authApi.login(payload);
   } catch (error) {
     if (!shouldUseDemoFallback(error)) {
       throw error;
     }
-    return DEMO_DATA.balance;
+
+    return demoLogin(payload);
   }
 };
+
+export const getCurrentUserRequest = async () => {
+  try {
+    return normalizeUser(await authApi.me());
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoGetCurrentUser();
+  }
+};
+
+export const getWalletRequest = async () => {
+  try {
+    return normalizeWallet(await walletApi.getWallet());
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoGetWallet();
+  }
+};
+
+export const getBalanceRequest = getWalletRequest;
 
 export const getTransactionsRequest = async () => {
   try {
-    const response = await api.get('/transactions');
-    return response.data;
+    return {
+      transactions: normalizeList(await transactionApi.getTransactions(), 'transactions', normalizeTransaction),
+    };
   } catch (error) {
     if (!shouldUseDemoFallback(error)) {
       throw error;
     }
-    return { transactions: DEMO_DATA.transactions };
+
+    return demoGetTransactions();
   }
 };
 
-export const getCardsRequest = async () => {
+export const getVehiclesRequest = async () => {
   try {
-    const response = await api.get('/cards');
-    return response.data;
+    const data = await vehicleApi.getVehicles();
+
+    return {
+      vehicles: normalizeList(data, 'vehicles', normalizeVehicle),
+      cars: normalizeList(data, 'vehicles', normalizeVehicle),
+    };
   } catch (error) {
     if (!shouldUseDemoFallback(error)) {
       throw error;
     }
-    return { cards: await getDemoCards() };
+
+    return demoGetVehicles();
   }
 };
 
-export const getCarsRequest = async () => {
+export const addVehicleRequest = async (payload) => {
   try {
-    const response = await api.get('/cars');
-    return response.data;
+    return await vehicleApi.addVehicle(payload);
   } catch (error) {
     if (!shouldUseDemoFallback(error)) {
       throw error;
     }
-    return { cars: await getDemoCars() };
+
+    return demoAddVehicle(payload);
   }
 };
+
+export const updateVehicleRequest = async (vehicleId, payload) => {
+  try {
+    return await vehicleApi.updateVehicle(vehicleId, payload);
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoUpdateVehicle(vehicleId, payload);
+  }
+};
+
+export const deactivateVehicleRequest = async (vehicleId) => {
+  try {
+    return await vehicleApi.deactivateVehicle(vehicleId);
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoDeactivateVehicle(vehicleId);
+  }
+};
+
+export const startFuelSessionRequest = async (payload) => {
+  try {
+    return await fuelSessionApi.startSession(payload);
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoStartSession(payload);
+  }
+};
+
+export const stopFuelSessionRequest = async (sessionId, payload) => {
+  try {
+    return await fuelSessionApi.stopSession(sessionId, payload);
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoUpdateSessionStatus(sessionId, 'completed');
+  }
+};
+
+export const cancelFuelSessionRequest = async (sessionId, payload) => {
+  try {
+    return await fuelSessionApi.cancelSession(sessionId, payload);
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoUpdateSessionStatus(sessionId, 'cancelled');
+  }
+};
+
+export const getFuelSessionRequest = async (sessionId) => {
+  try {
+    return normalizeSession(await fuelSessionApi.getSession(sessionId));
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoGetSession(sessionId);
+  }
+};
+
+export const getUserFuelSessionsRequest = async (userId) => {
+  try {
+    return {
+      sessions: normalizeList(await fuelSessionApi.getUserSessions(userId), 'sessions', normalizeSession),
+    };
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoGetUserSessions(userId);
+  }
+};
+
+export const updateUserRequest = async (payload) => {
+  try {
+    return await request('put', '/users', payload);
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoUpdateUser(payload);
+  }
+};
+
+export const updatePasswordRequest = async (payload) => {
+  try {
+    return await request('put', '/users/password', payload);
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoUpdatePassword(payload);
+  }
+};
+
+export const passwordResetRequest = async (payload) => userApi.passwordResetRequest(payload);
+
+export const passwordResetRequestByToken = async (payload) => passwordResetTokenApi.createToken(payload);
+
+export const validatePasswordResetTokenRequest = async (payload) => passwordResetTokenApi.validateToken(payload);
+
+export const getStationsRequest = async () => {
+  try {
+    return {
+      stations: normalizeList(await stationApi.getStations(), 'stations', normalizeStation),
+    };
+  } catch (error) {
+    if (!shouldUseDemoFallback(error)) {
+      throw error;
+    }
+
+    return demoGetStations();
+  }
+};
+
+export const getStationByIdRequest = async (stationId) => normalizeStation(await stationApi.getStationById(stationId));
+
+export const getStationsByCityRequest = async (city) => ({
+  stations: normalizeList(await stationApi.getStationsByCity(city), 'stations', normalizeStation),
+});
+
+export const getStationPricesRequest = async (stationId) => request('get', `/stations/${encodeURIComponent(stationId)}/prices`);
+
+export const getTransactionByIdRequest = async (transactionId) => normalizeTransaction(await transactionApi.getTransactionById(transactionId));
+
+export const updateTransactionStatusRequest = async (transactionId, payload) =>
+  transactionApi.updateTransactionStatus(transactionId, payload);
+
+export const createTransactionRequest = async (payload) => transactionApi.createTransaction(payload);
+
+export const authLogout = async () => {
+  await clearSessionStorage();
+  store.dispatch(clearFinance());
+  store.dispatch(logout());
+};
+
+export { normalizeUser, normalizeWallet, normalizeVehicle, normalizeTransaction, normalizeSession, normalizeStation };
 
 export default api;

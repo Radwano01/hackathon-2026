@@ -10,48 +10,59 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch } from 'react-redux';
-import { setCredentials } from '../redux/userSlice';
 import { clearFinance } from '../redux/financeSlice';
-import { loginRequest } from '../services/api';
+import { hydrateSession } from '../redux/userSlice';
+import { getCurrentUserRequest, loginRequest, normalizeUser } from '../services/api';
 
 export default function LoginScreen({ navigation }) {
   const dispatch = useDispatch();
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const onLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Validation', 'Please enter both email and password.');
+    setErrorMessage('');
+
+    if (!phone.trim() || !password.trim()) {
+      Alert.alert('Validation', 'Please enter both phone number and password.');
       return;
     }
 
     try {
       setLoading(true);
       const data = await loginRequest({
-        email: email.trim(),
+        phone: phone.trim(),
         password,
       });
 
       const token = data?.token || data?.accessToken;
-      const user = data?.user || {
-        name: data?.name || 'User',
-        email: data?.email || email.trim(),
-      };
+      const fallbackUser = normalizeUser({
+        userId: data?.userId || data?.id,
+        fullName: data?.fullName || data?.name,
+        phone: phone.trim(),
+        email: data?.email,
+      });
 
       if (!token) {
         throw new Error('No token returned from server.');
       }
 
       await AsyncStorage.setItem('token', token);
+      const currentUser = data?.user || (await getCurrentUserRequest().catch(() => null)) || fallbackUser;
+      const user = currentUser || fallbackUser;
       await AsyncStorage.setItem('user', JSON.stringify(user));
 
       dispatch(clearFinance());
-      dispatch(setCredentials({ token, user }));
+      dispatch(hydrateSession({ token, user }));
     } catch (error) {
-      Alert.alert('Login Failed', error?.message || 'Unable to login. Please try again.');
+      const message = error?.message || 'Unable to login. Please try again.';
+      setErrorMessage(message);
+      Alert.alert('Login Failed', message);
     } finally {
       setLoading(false);
     }
@@ -65,8 +76,7 @@ export default function LoginScreen({ navigation }) {
       <View style={styles.hero}>
         <Text style={styles.heroKicker}>CIRCLE K EXTRA</Text>
         <Text style={styles.heroTitle}>Fuel app login</Text>
-        <Text style={styles.heroText}>Use your email and password to continue.</Text>
-        <Text style={styles.demoText}>Demo: demo@fuel.com / 12345678</Text>
+        <Text style={styles.heroText}>Use your phone number and password to continue.</Text>
       </View>
 
       <View style={styles.card}>
@@ -75,24 +85,33 @@ export default function LoginScreen({ navigation }) {
 
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="Phone number"
           placeholderTextColor="#9ca3af"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
+          keyboardType="phone-pad"
+          value={phone}
+          onChangeText={setPhone}
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#9ca3af"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordWrap}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            placeholderTextColor="#9ca3af"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Pressable
+            style={({ pressed }) => [styles.eyeButton, pressed && styles.eyeButtonPressed]}
+            onPress={() => setShowPassword((current) => !current)}
+          >
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="#6b7280" />
+          </Pressable>
+        </View>
 
-        <Pressable style={styles.button} onPress={onLogin} disabled={loading}>
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+        <Pressable style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]} onPress={onLogin} disabled={loading}>
           {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Login</Text>}
         </Pressable>
 
@@ -134,11 +153,6 @@ const styles = StyleSheet.create({
     color: '#ffecec',
     lineHeight: 20,
   },
-  demoText: {
-    marginTop: 10,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 24,
@@ -166,12 +180,46 @@ const styles = StyleSheet.create({
     color: '#111827',
     backgroundColor: '#fff7f7',
   },
+  passwordWrap: {
+    borderWidth: 1,
+    borderColor: '#ffd4d7',
+    borderRadius: 16,
+    marginBottom: 12,
+    backgroundColor: '#fff7f7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+    paddingRight: 8,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 11,
+    color: '#111827',
+  },
+  eyeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyeButtonPressed: {
+    opacity: 0.75,
+  },
+  errorText: {
+    color: '#b91c1c',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
   button: {
     backgroundColor: '#e30613',
     borderRadius: 16,
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 6,
+  },
+  buttonPressed: {
+    opacity: 0.86,
   },
   buttonText: {
     color: '#ffffff',

@@ -1,14 +1,23 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { getCarsRequest, saveDemoCars } from '../services/api';
-import { setCars } from '../redux/financeSlice';
+import {
+  addVehicleRequest,
+  deactivateVehicleRequest,
+  getVehiclesRequest,
+  updateVehicleRequest,
+} from '../services/api';
+import { setVehicles } from '../redux/financeSlice';
 import CarItem from '../components/CarItem';
+import AppHeader from '../components/AppHeader';
 
-const parseCars = (data) => {
+const parseVehicles = (data) => {
   if (Array.isArray(data)) {
     return data;
+  }
+  if (Array.isArray(data?.vehicles)) {
+    return data.vehicles;
   }
   if (Array.isArray(data?.cars)) {
     return data.cars;
@@ -18,27 +27,26 @@ const parseCars = (data) => {
 
 export default function CarsScreen() {
   const dispatch = useDispatch();
-  const cars = useSelector((state) => state.finance.cars);
+  const vehicles = useSelector((state) => state.finance.vehicles);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [model, setModel] = useState('');
   const [plateNumber, setPlateNumber] = useState('');
+  const [fuelType, setFuelType] = useState('gasoline');
 
-  const loadCars = useCallback(async () => {
+  const loadVehicles = useCallback(async () => {
     try {
+      setLoading(true);
       setRefreshing(true);
-      const data = await getCarsRequest();
-      dispatch(setCars(parseCars(data)));
+      const data = await getVehiclesRequest();
+      dispatch(setVehicles(parseVehicles(data)));
     } catch (error) {
-      Alert.alert('Error', error?.message || 'Failed to load cars.');
+      Alert.alert('Error', error?.message || 'Failed to load vehicles.');
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
   }, [dispatch]);
-
-  const persistCars = async (nextCars) => {
-    dispatch(setCars(nextCars));
-    await saveDemoCars(nextCars);
-  };
 
   const onAddCar = async () => {
     if (!model.trim() || !plateNumber.trim()) {
@@ -46,63 +54,83 @@ export default function CarsScreen() {
       return;
     }
 
-    const nextCar = {
-      id: `car_${Date.now()}`,
-      model: model.trim(),
-      plateNumber: plateNumber.trim().toUpperCase(),
-      active: cars.length === 0,
-    };
-
     try {
-      await persistCars([nextCar, ...cars]);
+      await addVehicleRequest({
+        model: model.trim(),
+        plateNumber: plateNumber.trim().toUpperCase(),
+        fuelType: fuelType.trim() || 'gasoline',
+      });
+      await loadVehicles();
       setModel('');
       setPlateNumber('');
+      setFuelType('gasoline');
     } catch (error) {
-      Alert.alert('Error', error?.message || 'Unable to add car.');
+      Alert.alert('Error', error?.message || 'Unable to add vehicle.');
     }
   };
 
   const onToggleCarActive = async (id) => {
-    const nextCars = cars.map((car) =>
-      car.id === id ? { ...car, active: !car.active } : car
-    );
-    await persistCars(nextCars);
+    const target = vehicles.find((vehicle) => String(vehicle?.id || vehicle?.vehicleId) === String(id));
+
+    try {
+      if (target?.active) {
+        await deactivateVehicleRequest(id);
+      } else {
+        await updateVehicleRequest(id, { active: true });
+      }
+      await loadVehicles();
+    } catch (error) {
+      Alert.alert('Error', error?.message || 'Unable to update vehicle.');
+    }
   };
 
   const onDeleteCar = async (id) => {
-    const nextCars = cars.filter((car) => car.id !== id);
-    await persistCars(nextCars);
+    try {
+      await deactivateVehicleRequest(id);
+      await loadVehicles();
+    } catch (error) {
+      Alert.alert('Error', error?.message || 'Unable to deactivate vehicle.');
+    }
   };
 
   useFocusEffect(
     useCallback(() => {
-      loadCars();
-    }, [loadCars])
+      loadVehicles();
+    }, [loadVehicles])
   );
 
   return (
     <View style={styles.container}>
+      <AppHeader title="Vehicles" subtitle="Manage your registered cars" showBack />
+
+      {loading && !refreshing ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color="#e30613" />
+          <Text style={styles.loadingText}>Loading vehicles...</Text>
+        </View>
+      ) : null}
+
       <FlatList
-        data={cars}
-        keyExtractor={(item, index) => String(item?.id ?? item?._id ?? `${item?.plateNumber || 'car'}-${index}`)}
+        data={vehicles}
+        keyExtractor={(item, index) => String(item?.id ?? item?.vehicleId ?? `${item?.plateNumber || 'vehicle'}-${index}`)}
         renderItem={({ item }) => (
           <CarItem
             car={item}
-            onToggleActive={() => onToggleCarActive(item.id)}
-            onDelete={() => onDeleteCar(item.id)}
+            onToggleActive={() => onToggleCarActive(item.id || item.vehicleId)}
+            onDelete={() => onDeleteCar(item.id || item.vehicleId)}
           />
         )}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadCars} />}
-        contentContainerStyle={cars.length ? styles.listContent : styles.emptyContainer}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadVehicles} />}
+        contentContainerStyle={vehicles.length ? styles.listContent : styles.emptyContainer}
         ListHeaderComponent={
           <View style={styles.headerCard}>
             <Text style={styles.kicker}>CIRCLE K EXTRA</Text>
-            <Text style={styles.title}>Cars</Text>
+            <Text style={styles.title}>Vehicles</Text>
             <Text style={styles.subtitle}>
-              Add all registered cars and mark one or many as active.
+              Add all registered vehicles and mark one or many as active.
             </Text>
 
-            <TextInput style={styles.input} placeholder="Car model" value={model} onChangeText={setModel} />
+            <TextInput style={styles.input} placeholder="Vehicle model" value={model} onChangeText={setModel} />
             <TextInput
               style={styles.input}
               placeholder="Plate number"
@@ -110,13 +138,14 @@ export default function CarsScreen() {
               value={plateNumber}
               onChangeText={setPlateNumber}
             />
+            <TextInput style={styles.input} placeholder="Fuel type" value={fuelType} onChangeText={setFuelType} />
 
-            <Pressable style={styles.button} onPress={onAddCar}>
-              <Text style={styles.buttonText}>Add car</Text>
+            <Pressable style={({ pressed }) => [styles.button, pressed && styles.pressed]} onPress={onAddCar}>
+              <Text style={styles.buttonText}>Add vehicle</Text>
             </Pressable>
           </View>
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>No cars found.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>No vehicles added.</Text>}
       />
     </View>
   );
@@ -174,9 +203,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
+  pressed: {
+    opacity: 0.82,
+  },
   buttonText: {
     color: '#ffffff',
     fontWeight: '800',
+  },
+  loadingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  loadingText: {
+    color: '#6b7280',
+    fontSize: 13,
+    fontWeight: '600',
   },
   emptyContainer: {
     flexGrow: 1,

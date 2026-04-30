@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -11,20 +11,22 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
+import AppHeader from '../components/AppHeader';
 import { clearFinance } from '../redux/financeSlice';
 import { logout, updateUserProfile } from '../redux/userSlice';
-import { updateDemoProfile } from '../services/api';
+import { getCurrentUserRequest, updatePasswordRequest, updateUserRequest } from '../services/api';
 
 export default function ProfileScreen({ navigation }) {
   const dispatch = useDispatch();
   const { user, token } = useSelector((state) => state.user);
-  const { cards, cars } = useSelector((state) => state.finance);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
     setName(user?.name || '');
@@ -32,8 +34,26 @@ export default function ProfileScreen({ navigation }) {
     setEmail(user?.email || '');
   }, [user]);
 
-  const activeCardsCount = useMemo(() => cards.filter((card) => card.active).length, [cards]);
-  const activeCarsCount = useMemo(() => cars.filter((car) => car.active).length, [cars]);
+  const loadProfile = useCallback(async () => {
+    try {
+      const profile = await getCurrentUserRequest();
+      if (!profile) {
+        return;
+      }
+
+      setName(profile.fullName || profile.name || user?.name || '');
+      setPhone(profile.phone || user?.phone || '');
+      setEmail(user?.email || '');
+    } catch (error) {
+      Alert.alert('Error', error?.message || 'Unable to load profile.');
+    }
+  }, [user?.email, user?.name, user?.phone]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [loadProfile])
+  );
 
   const onSave = async () => {
     if (!name.trim() || !phone.trim() || !email.trim()) {
@@ -42,23 +62,30 @@ export default function ProfileScreen({ navigation }) {
     }
 
     try {
-      const updatedProfile = await updateDemoProfile({
-        name: name.trim(),
+      await updateUserRequest({
+        fullName: name.trim(),
         phone: phone.trim(),
         email: email.trim(),
-        ...(password.trim() ? { password } : {}),
       });
+
+      if (currentPassword.trim() && newPassword.trim()) {
+        await updatePasswordRequest({
+          oldPassword: currentPassword.trim(),
+          newPassword: newPassword.trim(),
+        });
+      }
 
       const profileForStorage = {
         id: user?.id || 'demo-user-1',
-        name: updatedProfile.name,
-        phone: updatedProfile.phone,
-        email: updatedProfile.email,
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
       };
 
       await AsyncStorage.setItem('user', JSON.stringify(profileForStorage));
       dispatch(updateUserProfile(profileForStorage));
-      setPassword('');
+      setCurrentPassword('');
+      setNewPassword('');
       Alert.alert('Saved', 'Profile updated successfully.');
     } catch (error) {
       Alert.alert('Error', error?.message || 'Unable to update profile.');
@@ -81,17 +108,19 @@ export default function ProfileScreen({ navigation }) {
       style={styles.flex}
     >
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <Text style={styles.heroKicker}>CIRCLE K EXTRA</Text>
-          <Text style={styles.heroTitle}>Profile & Access</Text>
-          <Text style={styles.heroText}>Edit your account, cards and cars in one place.</Text>
-        </View>
+        <AppHeader title="Edit Profile" subtitle="Update your account details" showBack />
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Your account</Text>
 
           <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
-          <TextInput style={styles.input} placeholder="Phone" value={phone} onChangeText={setPhone} />
+          <TextInput
+            style={styles.input}
+            placeholder="Phone"
+            keyboardType="phone-pad"
+            value={phone}
+            onChangeText={setPhone}
+          />
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -102,10 +131,17 @@ export default function ProfileScreen({ navigation }) {
           />
           <TextInput
             style={styles.input}
+            placeholder="Current password"
+            secureTextEntry
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
+          />
+          <TextInput
+            style={styles.input}
             placeholder="New password"
             secureTextEntry
-            value={password}
-            onChangeText={setPassword}
+            value={newPassword}
+            onChangeText={setNewPassword}
           />
 
           <Pressable style={styles.primaryButton} onPress={onSave}>
@@ -113,36 +149,9 @@ export default function ProfileScreen({ navigation }) {
           </Pressable>
         </View>
 
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{activeCardsCount}</Text>
-            <Text style={styles.summaryLabel}>Active cards</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{activeCarsCount}</Text>
-            <Text style={styles.summaryLabel}>Active cars</Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Manage access</Text>
-          <View style={styles.actionRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Cards')}>
-              <Text style={styles.secondaryButtonText}>Open cards</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Cars')}>
-              <Text style={styles.secondaryButtonText}>Open cars</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Session</Text>
-          <Text style={styles.mutedText}>{token ? 'You are logged in.' : 'You are logged out.'}</Text>
-          <Pressable style={styles.logoutButton} onPress={onLogout}>
-            <Text style={styles.logoutText}>Log out</Text>
-          </Pressable>
-        </View>
+        <Pressable style={styles.logoutButton} onPress={onLogout}>
+          <Text style={styles.logoutText}>Log out</Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -159,30 +168,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 28,
-  },
-  hero: {
-    backgroundColor: '#e30613',
-    borderRadius: 28,
-    padding: 20,
-    marginBottom: 16,
-  },
-  heroKicker: {
-    color: '#ffd5d8',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  heroTitle: {
-    marginTop: 8,
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#ffffff',
-  },
-  heroText: {
-    marginTop: 8,
-    color: '#ffecec',
-    fontSize: 14,
-    lineHeight: 20,
   },
   card: {
     backgroundColor: '#ffffff',
@@ -218,50 +203,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '800',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 22,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#fee2e2',
-  },
-  summaryValue: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#e30613',
-  },
-  summaryLabel: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#6b7280',
-    fontWeight: '600',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: '#fff1f2',
-    borderRadius: 16,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: '#b91c1c',
-    fontWeight: '800',
-  },
-  mutedText: {
-    color: '#6b7280',
-    marginBottom: 12,
   },
   logoutButton: {
     backgroundColor: '#111827',

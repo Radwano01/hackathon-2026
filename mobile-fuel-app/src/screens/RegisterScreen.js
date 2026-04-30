@@ -10,35 +10,66 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { registerRequest } from '../services/api';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDispatch } from 'react-redux';
+import { clearFinance } from '../redux/financeSlice';
+import { hydrateSession } from '../redux/userSlice';
+import { getCurrentUserRequest, normalizeUser, registerRequest } from '../services/api';
 
 export default function RegisterScreen({ navigation }) {
-  const [name, setName] = useState('');
+  const dispatch = useDispatch();
+  const [fullName, setFullName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const onRegister = async () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
+    setErrorMessage('');
+
+    if (!fullName.trim() || !phoneNumber.trim() || !email.trim() || !password.trim()) {
       Alert.alert('Validation', 'Please complete all fields.');
       return;
     }
 
     try {
       setLoading(true);
-      await registerRequest({
-        name: name.trim(),
+      const data = await registerRequest({
+        fullName: fullName.trim(),
+        phoneNumber: phoneNumber.trim(),
         email: email.trim(),
         password,
       });
-      Alert.alert('Success', 'Account created successfully.', [
+
+      const token = data?.token || data?.accessToken;
+      if (token) {
+        await AsyncStorage.setItem('token', token);
+        const fallbackUser = normalizeUser({
+          userId: data?.userId || data?.id,
+          fullName: fullName.trim(),
+          phone: phoneNumber.trim(),
+          email: email.trim(),
+        });
+        const currentUser = data?.user || (await getCurrentUserRequest().catch(() => null)) || fallbackUser;
+        await AsyncStorage.setItem('user', JSON.stringify(currentUser));
+        dispatch(clearFinance());
+        dispatch(hydrateSession({ token, user: currentUser }));
+        return;
+      }
+
+      Alert.alert('Success', data?.message || 'Account created successfully.', [
         {
           text: 'Go to login',
           onPress: () => navigation.navigate('Login'),
         },
       ]);
     } catch (error) {
-      Alert.alert('Registration Failed', error?.message || 'Unable to register. Please try again.');
+      const message = error?.message || 'Unable to register. Please try again.';
+      setErrorMessage(message);
+      Alert.alert('Registration Failed', message);
     } finally {
       setLoading(false);
     }
@@ -52,7 +83,7 @@ export default function RegisterScreen({ navigation }) {
       <View style={styles.hero}>
         <Text style={styles.heroKicker}>CIRCLE K EXTRA</Text>
         <Text style={styles.heroTitle}>Create account</Text>
-        <Text style={styles.heroText}>Register with your email and password to get started.</Text>
+        <Text style={styles.heroText}>Register with your full name, phone number, email and password.</Text>
       </View>
 
       <View style={styles.card}>
@@ -63,8 +94,17 @@ export default function RegisterScreen({ navigation }) {
           style={styles.input}
           placeholder="Full Name"
           placeholderTextColor="#9ca3af"
-          value={name}
-          onChangeText={setName}
+          value={fullName}
+          onChangeText={setFullName}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Phone Number"
+          placeholderTextColor="#9ca3af"
+          keyboardType="phone-pad"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
         />
 
         <TextInput
@@ -77,16 +117,26 @@ export default function RegisterScreen({ navigation }) {
           onChangeText={setEmail}
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#9ca3af"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordWrap}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            placeholderTextColor="#9ca3af"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Pressable
+            style={({ pressed }) => [styles.eyeButton, pressed && styles.eyeButtonPressed]}
+            onPress={() => setShowPassword((current) => !current)}
+          >
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color="#6b7280" />
+          </Pressable>
+        </View>
 
-        <Pressable style={styles.button} onPress={onRegister} disabled={loading}>
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+        <Pressable style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]} onPress={onRegister} disabled={loading}>
           {loading ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
@@ -159,12 +209,46 @@ const styles = StyleSheet.create({
     color: '#111827',
     backgroundColor: '#fff7f7',
   },
+  passwordWrap: {
+    borderWidth: 1,
+    borderColor: '#ffd4d7',
+    borderRadius: 16,
+    marginBottom: 12,
+    backgroundColor: '#fff7f7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+    paddingRight: 8,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 11,
+    color: '#111827',
+  },
+  eyeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyeButtonPressed: {
+    opacity: 0.75,
+  },
+  errorText: {
+    color: '#b91c1c',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
   button: {
     backgroundColor: '#e30613',
     borderRadius: 16,
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 6,
+  },
+  buttonPressed: {
+    opacity: 0.86,
   },
   buttonText: {
     color: '#ffffff',

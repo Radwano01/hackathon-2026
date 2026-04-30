@@ -16,6 +16,7 @@ const userSlice = createSlice({
       state.user = user || null;
       state.token = token || null;
       state.isAuthenticated = Boolean(token);
+      state.isHydrated = true;
     },
     updateUserProfile: (state, action) => {
       state.user = {

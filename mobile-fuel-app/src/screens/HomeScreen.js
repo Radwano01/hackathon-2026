@@ -1,15 +1,16 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
+import { Ionicons } from '@expo/vector-icons';
 import {
-  getBalanceRequest,
-  getCardsRequest,
-  getCarsRequest,
   getTransactionsRequest,
+  getVehiclesRequest,
+  getWalletRequest,
 } from '../services/api';
-import { setBalance, setCards, setCars, setTransactions } from '../redux/financeSlice';
+import { setTransactions, setVehicles, setWallet } from '../redux/financeSlice';
 import TransactionItem from '../components/TransactionItem';
+import AppHeader from '../components/AppHeader';
 
 const parseCollection = (data, key) => {
   if (Array.isArray(data)) {
@@ -21,36 +22,31 @@ const parseCollection = (data, key) => {
   return [];
 };
 
-const parseBalance = (data) => {
-  const value = data?.balance ?? data?.amount ?? data;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
-};
-
 export default function HomeScreen() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const { user } = useSelector((state) => state.user);
-  const { balance, transactions, cards, cars } = useSelector((state) => state.finance);
+  const { wallet, transactions, vehicles } = useSelector((state) => state.finance);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     try {
+      setLoading(true);
       setRefreshing(true);
-      const [balanceData, transactionsData, cardsData, carsData] = await Promise.all([
-        getBalanceRequest(),
+      const [walletData, transactionsData, vehiclesData] = await Promise.all([
+        getWalletRequest(),
         getTransactionsRequest(),
-        getCardsRequest(),
-        getCarsRequest(),
+        getVehiclesRequest(),
       ]);
 
-      dispatch(setBalance(parseBalance(balanceData)));
+      dispatch(setWallet(walletData));
       dispatch(setTransactions(parseCollection(transactionsData, 'transactions')));
-      dispatch(setCards(parseCollection(cardsData, 'cards')));
-      dispatch(setCars(parseCollection(carsData, 'cars')));
+      dispatch(setVehicles(parseCollection(vehiclesData, 'vehicles')));
     } catch (error) {
       Alert.alert('Error', error?.message || 'Failed to load dashboard data.');
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
   }, [dispatch]);
@@ -67,40 +63,50 @@ export default function HomeScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadDashboard} />}
     >
+      <AppHeader title="Dashboard" subtitle="Your account overview" showProfile />
+
       <View style={styles.hero}>
         <Text style={styles.heroKicker}>CIRCLE K EXTRA</Text>
         <Text style={styles.heroTitle}>Welcome, {user?.name || 'User'}</Text>
         <Text style={styles.heroText}>Manage fuel, cards, cars and your profile from one place.</Text>
       </View>
 
+      {loading && !refreshing ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color="#e30613" />
+          <Text style={styles.loadingText}>Loading your dashboard...</Text>
+        </View>
+      ) : null}
+
       <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Current Balance</Text>
-        <Text style={styles.balanceValue}>${balance.toFixed(2)}</Text>
+        <View style={styles.balanceTitleRow}>
+          <Text style={styles.balanceLabel}>Current Balance</Text>
+          <Ionicons name="wallet-outline" size={18} color="#6b7280" />
+        </View>
+        <Text style={styles.balanceValue}>{wallet?.currency || 'USD'} {Number(wallet?.balance || 0).toFixed(2)}</Text>
         <Text style={styles.balanceCaption}>Available for fuel and payments</Text>
       </View>
 
       <View style={styles.row}>
-        <Pressable style={styles.summaryCard} onPress={() => navigation.navigate('Cards')}>
-          <Text style={styles.summaryLabel}>Cards</Text>
-          <Text style={styles.summaryValue}>{cards.length}</Text>
-          <Text style={styles.summaryHint}>{cards.filter((card) => card.active).length} active</Text>
+        <Pressable style={({ pressed }) => [styles.summaryCard, pressed && styles.pressed]} onPress={() => navigation.navigate('Cars')}>
+          <Ionicons name="car-outline" size={18} color="#e30613" />
+          <Text style={styles.summaryLabel}>Vehicles</Text>
+          <Text style={styles.summaryValue}>{vehicles.length}</Text>
+          <Text style={styles.summaryHint}>{vehicles.filter((vehicle) => vehicle.active).length} active</Text>
         </Pressable>
 
-        <Pressable style={styles.summaryCard} onPress={() => navigation.navigate('Cars')}>
-          <Text style={styles.summaryLabel}>Cars</Text>
-          <Text style={styles.summaryValue}>{cars.length}</Text>
-          <Text style={styles.summaryHint}>{cars.filter((car) => car.active).length} active</Text>
+        <Pressable style={({ pressed }) => [styles.summaryCard, pressed && styles.pressed]} onPress={() => navigation.navigate('Transactions')}>
+          <Ionicons name="list-outline" size={18} color="#e30613" />
+          <Text style={styles.summaryLabel}>Transactions</Text>
+          <Text style={styles.summaryValue}>{transactions.length}</Text>
+          <Text style={styles.summaryHint}>Recent activity</Text>
         </Pressable>
       </View>
 
       <View style={styles.quickGrid}>
-        <Pressable style={styles.quickButton} onPress={() => navigation.navigate('Transactions')}>
-          <Text style={styles.quickButtonTitle}>Transactions</Text>
-          <Text style={styles.quickButtonText}>See payment history</Text>
-        </Pressable>
-        <Pressable style={styles.quickButton} onPress={() => navigation.navigate('Profile')}>
-          <Text style={styles.quickButtonTitle}>Profile</Text>
-          <Text style={styles.quickButtonText}>Edit account details</Text>
+        <Pressable style={({ pressed }) => [styles.quickButton, pressed && styles.pressed]} onPress={() => navigation.navigate('Fuel Sessions')}>
+          <Text style={styles.quickButtonTitle}>Fuel Sessions</Text>
+          <Text style={styles.quickButtonText}>Start or stop fueling</Text>
         </Pressable>
       </View>
 
@@ -157,6 +163,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fee2e2',
   },
+  balanceTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   balanceLabel: {
     color: '#6b7280',
     fontSize: 13,
@@ -184,6 +195,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fee2e2',
     padding: 14,
+  },
+  pressed: {
+    opacity: 0.85,
   },
   summaryLabel: {
     color: '#e30613',
@@ -227,6 +241,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 10,
     color: '#111827',
+  },
+  loadingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  loadingText: {
+    color: '#6b7280',
+    fontSize: 13,
+    fontWeight: '600',
   },
   emptyText: {
     color: '#6b7280',
