@@ -1,0 +1,40 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+
+        - id: user-service
+          uri: lb://USER
+          predicates:
+            - Path=/api/v1/users/**
+
+        - id: wallet-service
+          uri: lb://WALLET
+          predicates:
+            - Path=/api/v1/wallet/**
+
+        - id: payment-service
+          uri: lb://PAYMENT
+          predicates:
+            - Path=/api/v1/payment/**
+
+        - id: transaction-service
+          uri: lb://TRANSACTION
+          predicates:
+            - Path=/api/v1/transactions/**
+
+        - id: payment-method-service
+          uri: lb://PAYMENTMETHOD
+          predicates:
+            - Path=/api/v1/payment-methods/**
+
+        - id: fuel-session-service
+          uri: lb://FUELSESSION
+          predicates:
+            - Path=/api/v1/fuel-sessions/**
