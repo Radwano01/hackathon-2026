@@ -43,24 +43,41 @@ public class UserServiceImpl implements UserService{
 
         User savedUser = userRepository.save(user);
 
+<<<<<<< HEAD
         restTemplate.postForObject(
                 "http://WALLET/api/v1/wallet/internal/{userId}",
                 new CreateWalletRequest(),
                 Void.class,
                 savedUser.getId()
         );
+=======
+        try {
+            restTemplate.postForObject(
+                    "http://WALLET/internal/wallet/{userId}",
+                    savedUser.getId(),
+                    Void.class,
+                    savedUser.getId()
+            );
+>>>>>>> a114d8b (readme added)
 
-        RegisterAuthDTO authRequest = new RegisterAuthDTO(
-                savedUser.getId(),
-                registerDTO.password(),
-                "USER"
-        );
+            RegisterAuthDTO authRequest = new RegisterAuthDTO(
+                    savedUser.getId(),
+                    registerDTO.password(),
+                    "USER"
+            );
 
-        restTemplate.postForObject(
-                "http://AUTH/api/v1/auth/register",
-                authRequest,
-                Void.class
-        );
+            // Use internal endpoint to bypass JWT filter issues with service-to-service calls
+            restTemplate.postForObject(
+                    "http://AUTH/api/v1/auth/register",
+                    authRequest,
+                    Void.class
+            );
+        }catch (Exception e) {
+
+            userRepository.deleteById(savedUser.getId());
+
+            throw new RuntimeException("Registration failed. Rolled back user.", e);
+        }
     }
 
     @Override

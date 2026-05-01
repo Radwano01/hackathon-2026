@@ -27,23 +27,50 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService customUserDetailsService;
 
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
+
         try {
+            String path = request.getRequestURI();
+
+            // ✅ SKIP INTERNAL ENDPOINTS
+            if (path.startsWith("/internal")) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             String token = getJWTFromRequest(request);
+
             if (StringUtils.hasText(token) && jwtGenerator.validateToken(token)) {
+
                 UUID userId = jwtGenerator.getUserIdFromJWT(token);
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(userId.toString());
+
+                UserDetails userDetails =
+                        customUserDetailsService.loadUserByUsername(userId.toString());
+
                 UsernamePasswordAuthenticationToken authenticationToken =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+
+                authenticationToken.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
+
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
             }
+
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
             return;
         }
+
         filterChain.doFilter(request, response);
     }
 

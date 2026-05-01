@@ -61,7 +61,7 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleDTO findByUserIdAndVehicleId(UUID userId, UUID vehicleId) {
 
         Vehicle vehicle = vehicleRepository
-                .findByUserIdAndVehicleId(userId, vehicleId)
+                .findByUserIdAndId(userId, vehicleId)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Vehicle not found for this user"
                 ));
@@ -83,7 +83,7 @@ public class VehicleServiceImpl implements VehicleService {
     public void update(UUID userId, UUID vehicleId, UpdateDTO updateDTO) {
 
         Vehicle vehicle = vehicleRepository
-                .findByUserIdAndVehicleId(userId, vehicleId)
+                .findByUserIdAndId(userId, vehicleId)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Vehicle not found for this user"
                 ));
@@ -116,7 +116,7 @@ public class VehicleServiceImpl implements VehicleService {
     public void deactivate(UUID userId, UUID vehicleId) {
 
         Vehicle vehicle = vehicleRepository
-                .findByUserIdAndVehicleId(userId, vehicleId)
+                .findByUserIdAndId(userId, vehicleId)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Vehicle not found for this user"
                 ));
@@ -171,12 +171,13 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public Vehicle findByRfid(String rfidTag) {
-        return null;
+        return vehicleRepository.findByRfidTag(rfidTag)
+                .orElseThrow(() -> new EntityNotFoundException("Vehicle not found with RFID: " + rfidTag));
     }
 
     @Override
     public VehicleValidationDTO validate(UUID userId, UUID vehicleId) {
-        Vehicle vehicle = vehicleRepository.findByUserIdAndVehicleId(userId, vehicleId)
+        Vehicle vehicle = vehicleRepository.findByUserIdAndId(userId, vehicleId)
                 .orElseThrow(() -> new EntityNotFoundException("this user does not have such this car"));
 
         return VehicleValidationDTO.builder()

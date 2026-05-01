@@ -6,14 +6,15 @@ import com.stripe.model.PaymentIntent;
 import com.stripe.param.PaymentIntentCreateParams;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+<<<<<<< HEAD
+=======
+import org.springframework.http.HttpMethod;
+>>>>>>> a114d8b (readme added)
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class PaymentServiceImpl implements PaymentService {
@@ -57,6 +58,7 @@ public class PaymentServiceImpl implements PaymentService {
         try {
 
             // 2. GET PAYMENT METHODS
+<<<<<<< HEAD
             PaymentMethodDTO[] methods = restTemplate.getForObject(
                     "http://PAYMENT-METHOD/api/v1/payment-methods/internal/{userId}",
                     PaymentMethodDTO[].class,
@@ -73,11 +75,36 @@ public class PaymentServiceImpl implements PaymentService {
 
             // 3. TRY PAYMENT METHODS
             for (PaymentMethodDTO method : sorted) {
+=======
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> methods = restTemplate.getForObject(
+                    "http://PAYMENT-METHOD/api/v1/payment-methods/internal/{userId}",
+                    List.class,
+                    userId
+            );
+
+            if (methods == null || methods.isEmpty()) {
+                throw new RuntimeException("No payment methods");
+            }
+
+            List<Map<String, Object>> sorted = methods.stream()
+                    .sorted(Comparator.comparingInt(m -> (Integer) m.getOrDefault("priority", Integer.MAX_VALUE)))
+                    .toList();
+
+            // 3. TRY PAYMENT METHODS
+            for (Map<String, Object> method : sorted) {
+>>>>>>> a114d8b (readme added)
 
                 try {
+                    String methodType = (String) method.get("paymentMethodType");
+                    Object cardTokenObj = method.get("cardToken");
 
                     // WALLET
+<<<<<<< HEAD
                     if (method.paymentMethodType() == PaymentMethodType.WALLET) {
+=======
+                    if ("WALLET".equals(methodType)) {
+>>>>>>> a114d8b (readme added)
 
                         restTemplate.postForObject(
                                 "http://WALLET/api/v1/wallet/internal/{userId}/update",
@@ -91,14 +118,22 @@ public class PaymentServiceImpl implements PaymentService {
                     }
 
                     // STRIPE CARD
+<<<<<<< HEAD
                     if (method.paymentMethodType() == PaymentMethodType.CARD) {
+=======
+                    if ("CARD".equals(methodType)) {
+>>>>>>> a114d8b (readme added)
 
-                        if (method.cardToken() == null) {
+                        if (cardTokenObj == null) {
                             throw new RuntimeException("Missing card token");
                         }
 
                         boolean success = chargeWithStripe(
+<<<<<<< HEAD
                                 method.cardToken().toString(),
+=======
+                                cardTokenObj.toString(),
+>>>>>>> a114d8b (readme added)
                                 dto.amount()
                         );
 
@@ -111,15 +146,25 @@ public class PaymentServiceImpl implements PaymentService {
                     }
 
                 } catch (Exception e) {
+<<<<<<< HEAD
                     System.out.println("Failed method: " + method.id() + " " + e.getMessage());
+=======
+                    System.out.println("Failed method: " + method.get("id") + " " + e.getMessage());
+>>>>>>> a114d8b (readme added)
                 }
             }
 
             // 4. UPDATE TRANSACTION STATUS
             if (paid) {
 
+<<<<<<< HEAD
                 restTemplate.patchForObject(
                         "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=SUCCESS",
+=======
+                restTemplate.exchange(
+                        "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=SUCCESS",
+                        HttpMethod.PATCH,
+>>>>>>> a114d8b (readme added)
                         null,
                         Void.class,
                         tx.id()
@@ -133,8 +178,14 @@ public class PaymentServiceImpl implements PaymentService {
 
             } else {
 
+<<<<<<< HEAD
                 restTemplate.patchForObject(
                         "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=FAILED",
+=======
+                restTemplate.exchange(
+                        "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=FAILED",
+                        HttpMethod.PATCH,
+>>>>>>> a114d8b (readme added)
                         null,
                         Void.class,
                         tx.id()
@@ -145,8 +196,14 @@ public class PaymentServiceImpl implements PaymentService {
 
         } catch (Exception e) {
 
+<<<<<<< HEAD
             restTemplate.patchForObject(
                     "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=FAILED",
+=======
+            restTemplate.exchange(
+                    "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=FAILED",
+                    HttpMethod.PATCH,
+>>>>>>> a114d8b (readme added)
                     null,
                     Void.class,
                     tx.id()
@@ -157,6 +214,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private boolean chargeWithStripe(String paymentMethodId, BigDecimal amount) {
+<<<<<<< HEAD
 
         try {
             PaymentIntentCreateParams params =
@@ -175,5 +233,67 @@ public class PaymentServiceImpl implements PaymentService {
             System.out.println("Stripe error: " + e.getMessage());
             return false;
         }
+=======
+
+        try {
+            PaymentIntentCreateParams params =
+                    PaymentIntentCreateParams.builder()
+                            .setAmount(amount.multiply(BigDecimal.valueOf(100)).longValue())
+                            .setCurrency("usd")
+                            .setPaymentMethod(paymentMethodId)
+                            .setConfirm(true)
+                            .build();
+
+            PaymentIntent intent = PaymentIntent.create(params);
+
+            return "succeeded".equals(intent.getStatus());
+
+        } catch (Exception e) {
+            System.out.println("Stripe error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public PaymentEligibilityResponse checkEligibility(UUID userId, BigDecimal estimatedAmount) {
+
+        PaymentMethodDTO[] methods = restTemplate.getForObject(
+                "http://PAYMENT-METHOD/api/v1/payment-methods/internal/{userId}",
+                PaymentMethodDTO[].class,
+                userId
+        );
+
+        if (methods == null || methods.length == 0) {
+            return new PaymentEligibilityResponse(
+                    false,
+                    "No payment methods found"
+            );
+        }
+
+        boolean hasValidMethod = Arrays.stream(methods)
+                .anyMatch(method -> {
+
+                    PaymentMethodType type = method.paymentMethodType();
+
+                    if (type == PaymentMethodType.WALLET) {
+                        return true; // later you can check wallet balance here
+                    }
+
+                    if (type == PaymentMethodType.CARD) {
+                        return method.cardToken() != null;
+                    }
+
+                    return false;
+                });
+
+        if (!hasValidMethod) {
+            return new PaymentEligibilityResponse(
+                    false,
+                    "No valid payment method available"
+            );
+        }
+
+        return new PaymentEligibilityResponse(true, "OK");
+>>>>>>> a114d8b (readme added)
     }
 }

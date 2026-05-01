@@ -19,15 +19,6 @@ public class StationController {
     public StationController(StationService stationService) {
         this.stationService = stationService;
     }
-
-
-    //admin page
-    @PostMapping
-    public ResponseEntity<UUID> create(@RequestBody CreateStationDTO request) {
-        return ResponseEntity.status(201).body(stationService.create(request));
-    }
-
-    @GetMapping
     public ResponseEntity<List<StationDTO>> getAll() {
         return ResponseEntity.ok(stationService.getAll());
     }
@@ -46,20 +37,6 @@ public class StationController {
     @GetMapping("/city/{city}")
     public ResponseEntity<List<StationDTO>> getByCity(@PathVariable String city) {
         return ResponseEntity.ok(stationService.getByCity(city));
-    }
-
-    //admin page
-    @PatchMapping("/{id}/activate")
-    public ResponseEntity<Void> activate(@PathVariable UUID id) {
-        stationService.activate(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    //admin page
-    @PatchMapping("/{id}/deactivate")
-    public ResponseEntity<Void> deactivate(@PathVariable UUID id) {
-        stationService.deactivate(id);
-        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/price")

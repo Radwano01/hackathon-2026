@@ -45,6 +45,7 @@ public class FuelSessionServiceImpl implements FuelSessionService {
             throw new IllegalStateException("Vehicle not found");
         }
 
+<<<<<<< HEAD
         FuelSession session = new FuelSession(
                 vehicle.vehicleId(),
                 vehicle.userId(),
@@ -53,6 +54,28 @@ public class FuelSessionServiceImpl implements FuelSessionService {
                 FuelStatusType.STARTED
         );
 
+=======
+        PaymentEligibilityResponse eligibility = restTemplate.getForObject(
+                "http://PAYMENT/internal/payments/users/{userId}/eligibility?estimatedAmount=500",
+                PaymentEligibilityResponse.class,
+                vehicle.userId()
+        );
+
+        if (eligibility == null || !eligibility.eligible()) {
+            throw new IllegalStateException(
+                    "Payment not allowed: " + (eligibility != null ? eligibility.reason() : "unknown")
+            );
+        }
+
+        FuelSession session = new FuelSession(
+                vehicle.vehicleId(),
+                vehicle.userId(),
+                request.stationId(),
+                request.fuelType(),
+                FuelStatusType.STARTED
+        );
+
+>>>>>>> a114d8b (readme added)
         FuelSession saved = fuelSessionRepository.save(session);
 
         return new FuelSessionStartResponse(

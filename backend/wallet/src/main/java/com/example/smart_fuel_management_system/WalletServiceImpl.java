@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
-public class WalletServiceImpl implements WalletService{
+public class WalletServiceImpl implements WalletService {
 
     private final WalletRepository walletRepository;
 
@@ -23,16 +23,27 @@ public class WalletServiceImpl implements WalletService{
         this.walletRepository = walletRepository;
     }
 
+    // ============== USER OPERATIONS ==============
 
     @Override
-    public void createWallet(UUID usedId) {
-        Wallet wallet = new Wallet(
-                BigDecimal.ZERO,
-                "$",
-                StatusType.ACTIVE,
-                usedId,
-                LocalDateTime.now()
-        );
+    public WalletDTO getWalletDetails(UUID userId) {
+        Wallet wallet = getWalletByUserId(userId);
+        return WalletDTO.builder()
+                .balance(wallet.getBalance())
+                .currency(wallet.getCurrency())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void updateBalance(UUID userId, WalletUpdateDTO request) {
+        Wallet wallet = walletRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User wallet not found"));
+
+        switch (request.type()) {
+            case TOP_UP, REFUND, BONUS -> wallet.credit(request.amount());
+            case WITHDRAW -> wallet.debit(request.amount());
+        }
 
         walletRepository.save(wallet);
     }
@@ -40,88 +51,70 @@ public class WalletServiceImpl implements WalletService{
     @Override
     public void deactivateWallet(UUID userId) {
         Wallet wallet = getWalletByUserId(userId);
-        if(wallet.getStatusType().equals(StatusType.BLOCKED)){
-            throw new EntityExistsException("this account already blocked");
-        }
-        if(wallet.getStatusType().equals(StatusType.INACTIVE)){
-            throw new EntityExistsException("this account already inactive");
-        }
-
+        validateStatusChange(wallet.getStatusType(), "Cannot deactivate");
         wallet.setStatusType(StatusType.INACTIVE);
         walletRepository.save(wallet);
     }
 
-    //admin page access
+    // ============== ADMIN OPERATIONS ==============
+
     @Override
     public void activateWallet(UUID userId) {
         Wallet wallet = getWalletByUserId(userId);
-        if(wallet.getStatusType().equals(StatusType.BLOCKED)){
-            throw new EntityExistsException("this account already blocked");
+        if (!wallet.getStatusType().equals(StatusType.INACTIVE)) {
+            throw new EntityExistsException("Wallet is not in inactive state. Current status: " + wallet.getStatusType());
         }
-        if(wallet.getStatusType().equals(StatusType.INACTIVE)){
-            throw new EntityExistsException("this account already inactive");
-        }
-
         wallet.setStatusType(StatusType.ACTIVE);
         walletRepository.save(wallet);
     }
 
-    // admin page access
     @Override
     public void blockWallet(UUID userId) {
         Wallet wallet = getWalletByUserId(userId);
-
-        if(wallet.getStatusType().equals(StatusType.BLOCKED)){
-            throw new EntityExistsException("this account already blocked");
+        if (wallet.getStatusType().equals(StatusType.BLOCKED)) {
+            throw new EntityExistsException("Wallet is already blocked");
         }
-        if(wallet.getStatusType().equals(StatusType.INACTIVE)){
-            throw new EntityExistsException("this account already inactive");
-        }
-
         wallet.setStatusType(StatusType.BLOCKED);
         walletRepository.save(wallet);
     }
 
-    @Override
-    public WalletDTO getWalletDetails(UUID userId) {
-        Wallet wallet = getWalletByUserId(userId);
-
-        return WalletDTO.builder()
-                .balance(wallet.getBalance())
-                .currency(wallet.getCurrency())
-                .build();
-    }
-
+    // ============== INTERNAL OPERATIONS ==============
 
     @Override
-    @Transactional
-    public void updateBalance(UUID userId, WalletUpdateDTO request) {
-        Wallet wallet = walletRepository.findByIdForUpdate(userId)
-                .orElseThrow(()-> new EntityNotFoundException("This user does not have wallet"));
-
-        switch (request.type()) {
-
-            case TOP_UP, REFUND, BONUS: wallet.credit(request.amount());
-
-            case WITHDRAW: wallet.debit(request.amount());
-        }
-
+    public void createWallet(UUID userId) {
+        Wallet wallet = new Wallet(
+                BigDecimal.ZERO,
+                "$",
+                StatusType.ACTIVE,
+                userId,
+                LocalDateTime.now()
+        );
         walletRepository.save(wallet);
     }
 
     @Override
     public void applyBonus(WalletBonusDTO request) {
-
         Wallet wallet = getWalletByUserId(request.userId());
-
         wallet.credit(request.amount());
-
         walletRepository.save(wallet);
     }
 
-    private Wallet getWalletByUserId(UUID userId){
+    // ============== HELPER METHODS ==============
+
+    private Wallet getWalletByUserId(UUID userId) {
         return walletRepository.findByUserId(userId)
-                .orElseThrow(()-> new EntityNotFoundException("This user does not have wallet"));
+                .orElseThrow(() -> new EntityNotFoundException("User wallet not found"));
     }
 
+    /**
+     * Validates that wallet status allows transitions (not already in blocked/inactive state)
+     */
+    private void validateStatusChange(StatusType currentStatus, String action) {
+        if (currentStatus.equals(StatusType.BLOCKED)) {
+            throw new EntityExistsException(action + ": Wallet is blocked");
+        }
+        if (currentStatus.equals(StatusType.INACTIVE)) {
+            throw new EntityExistsException(action + ": Wallet is already inactive");
+        }
+    }
 }
