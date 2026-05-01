@@ -45,6 +45,23 @@ EXPO_PUBLIC_API_BASE_URL=http://localhost:8080/v1
 EXPO_PUBLIC_DEMO_MODE=true
 ```
 
+## Maps (Nearby Stations)
+
+This app includes a `Map` tab that shows nearby gas stations using Google Maps / Places.
+
+- Install native deps (run in `mobile-fuel-app`):
+
+```bash
+npm install react-native-maps expo-location
+# If using expo-managed workflow run: npx expo install react-native-maps expo-location
+```
+
+- Set your Google Maps API key in `.env` (see `.env.example`) as `GOOGLE_MAPS_API_KEY`. Do NOT commit your key.
+ - Set your Google Maps API key in the proxy server (see `server/README.md`) as `GOOGLE_MAPS_API_KEY`.
+ - If running the local proxy, set `EXPO_PUBLIC_PLACES_PROXY_URL=http://localhost:4000` in your `.env` (see `.env.example`).
+ - `app.config.js` exposes `EXPO_PUBLIC_PLACES_PROXY_URL` into Expo runtime under `extra.PLACES_PROXY_URL`. You can copy `.env.example` to `.env` and set `EXPO_PUBLIC_PLACES_PROXY_URL` there.
+
+
 ## Install
 
 From the `mobile-fuel-app` folder:

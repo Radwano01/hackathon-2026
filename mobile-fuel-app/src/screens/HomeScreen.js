@@ -104,9 +104,9 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.quickGrid}>
-        <Pressable style={({ pressed }) => [styles.quickButton, pressed && styles.pressed]} onPress={() => navigation.navigate('Fuel Sessions')}>
-          <Text style={styles.quickButtonTitle}>Fuel Sessions</Text>
-          <Text style={styles.quickButtonText}>Start or stop fueling</Text>
+        <Pressable style={({ pressed }) => [styles.quickButton, pressed && styles.pressed]} onPress={() => navigation.navigate('Map')}>
+          <Text style={styles.quickButtonTitle}>Stations</Text>
+          <Text style={styles.quickButtonText}>Find nearby gas stations</Text>
         </Pressable>
       </View>
 

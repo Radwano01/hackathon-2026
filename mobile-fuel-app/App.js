@@ -16,7 +16,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import TransactionsScreen from './src/screens/TransactionsScreen';
-import FuelSessionsScreen from './src/screens/FuelSessionsScreen';
+import MapScreen from './src/screens/MapScreen';
 import CardsScreen from './src/screens/CardsScreen';
 import CarsScreen from './src/screens/CarsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
@@ -42,8 +42,8 @@ function MainTabs() {
     if (routeName === 'Transactions') {
       return <Ionicons name="list-outline" size={size} color={color} />;
     }
-    if (routeName === 'Fuel Sessions') {
-      return <MaterialCommunityIcons name="fuel" size={size} color={color} />;
+    if (routeName === 'Map') {
+      return <MaterialCommunityIcons name="map-outline" size={size} color={color} />;
     }
     if (routeName === 'Cards') {
       return <Ionicons name="card-outline" size={size} color={color} />;
@@ -68,7 +68,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Transactions" component={TransactionsScreen} />
-      <Tab.Screen name="Fuel Sessions" component={FuelSessionsScreen} />
+      <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Cards" component={CardsScreen} options={{ tabBarLabel: 'Wallet' }} />
       <Tab.Screen name="Cars" component={CarsScreen} options={{ tabBarLabel: 'Vehicles' }} />
       <Tab.Screen
