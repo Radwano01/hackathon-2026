@@ -1,104 +1,153 @@
 # User Service
 
-Manages user registration, authentication, and profile management. Entry point for new users joining the system.
-
 ## Overview
 
-- **Port**: 8200
-- **Base Path**: `/api/v1/users`
-- **Service Name**: USER
-- **Database**: PostgreSQL (users table)
+The User Service manages registration, login, profile access, profile updates, password changes, and password reset requests.
 
-## Features
+**Base Path:** `/api/v1/users`  
+**Service Type:** User-facing and internal endpoints
 
-✅ User registration with email validation  
-✅ User authentication (delegates to Auth Service)  
-✅ Profile management (get/update user info)  
-✅ User search and listing (admin)  
-✅ Automatic wallet creation on registration  
+## Current Endpoints
 
-## API Endpoints
+### Public APIs
 
-### Public (No Auth)
+#### Register
+`POST /api/v1/users/register`
 
-```
-POST /api/v1/users/register
-  Request: { email, password, firstName, lastName, phone }
-  Response: { userId, email, createdAt }
-  
-POST /api/v1/users/login
-  Request: { email, password }
-  Response: { userId, token, expiresAt }
+Request body:
+```json
+{
+  "fullName": "John Doe",
+  "phoneNumber": "+15551234567",
+  "email": "john@example.com",
+  "password": "Secret123!"
+}
 ```
 
-### Protected (Auth Required)
+Returns `201 Created`.
 
-```
-GET /api/v1/users/profile
-  Response: { id, email, firstName, lastName, phone, createdAt }
-  
-PATCH /api/v1/users/profile
-  Request: { firstName, lastName, phone }
-  Response: 204 No Content
-  
-GET /api/v1/users/{userId}
-  Response: { id, email, firstName, lastName, phone }
-```
+#### Login
+`POST /api/v1/users/login`
 
-### Internal (Service-to-Service)
-
-```
-GET /internal/users/{userId}
-  Response: { id, email, firstName, lastName }
+Request body:
+```json
+{
+  "phoneNumber": "+15551234567",
+  "password": "Secret123!"
+}
 ```
 
-## Database Schema
-
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    phone VARCHAR(20),
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
-);
+Response body:
+```json
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "token": "jwt-token",
+  "refreshToken": "refresh-token"
+}
 ```
 
-## Running
+#### Request password reset
+`POST /api/v1/users/password-reset/request?email=john@example.com`
 
-```bash
-cd user
-mvn spring-boot:run
+#### Reset password
+`POST /api/v1/users/password-reset?token=reset-token&newPassword=Secret123!`
+
+### Authenticated APIs
+
+#### Get current user profile
+`GET /api/v1/users`
+
+Response body:
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "fullName": "John Doe",
+  "phoneNumber": "+15551234567",
+  "wallet": {
+    "balance": 0.0,
+    "currency": "USD",
+    "statusType": "ACTIVE"
+  }
+}
 ```
 
-Server starts on `http://localhost:8200`
+#### Update current user
+`PATCH /api/v1/users`
 
-## Integration with Other Services
-
-On registration, automatically triggers:
-1. **Auth Service**: Create auth credentials
-2. **Wallet Service**: Create user wallet with zero balance
-
-## Configuration
-
-```yaml
-server:
-  port: 8001
-spring:
-  application:
-    name: USER
-  datasource:
-    url: jdbc:postgresql://localhost:5432/user_db
+Request body:
+```json
+{
+  "fullName": "John D. Doe",
+  "email": "john@example.com",
+  "phoneNumber": "+15551234567"
+}
 ```
 
-## Dependencies
+#### Update password
+`PATCH /api/v1/users/password`
 
-- Spring Web
-- Spring Data JPA
-- PostgreSQL Driver
-- Spring Security
-- Spring Cloud Eureka
+Request body:
+```json
+{
+  "oldPassword": "Secret123!",
+  "newPassword": "NewSecret123!"
+}
+```
+
+### Internal APIs
+
+#### Get user response for service-to-service calls
+`GET /api/v1/users/internal/{userId}`
+
+Returns:
+```json
+{
+  "fullName": "John Doe",
+  "email": "john@example.com"
+}
+```
+
+## DTOs
+
+### RegisterDTO
+- `fullName`
+- `phoneNumber`
+- `email`
+- `password`
+
+### LoginDTO
+- `phoneNumber`
+- `password`
+
+### AuthDTO
+- `userId`
+- `token`
+- `refreshToken`
+
+### UserDTO
+- `id`
+- `fullName`
+- `phoneNumber`
+- `wallet`
+
+### UpdateDTO
+- `fullName`
+- `email`
+- `phoneNumber`
+
+### UpdatePasswordDTO
+- `oldPassword`
+- `newPassword`
+
+### UserResponse
+- `fullName`
+- `email`
+
+### CreateWalletRequest
+- `userId`
+
+## Notes
+
+- Login uses phone number, not email.
+- The current controller exposes the authenticated user at `GET /api/v1/users`, not `/profile`.
+- Registration triggers downstream wallet creation through the User Service flow.

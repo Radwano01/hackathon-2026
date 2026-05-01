@@ -29,11 +29,6 @@ public class StationController {
         return ResponseEntity.ok(stationService.getById(id));
     }
 
-    @GetMapping("/{id}/internal")
-    public ResponseEntity<StationResponseDTO> getStationInternalById(@PathVariable UUID id) {
-        return ResponseEntity.ok(stationService.getInternalById(id));
-    }
-
     @GetMapping("/city/{city}")
     public ResponseEntity<List<StationDTO>> getByCity(@PathVariable String city) {
         return ResponseEntity.ok(stationService.getByCity(city));

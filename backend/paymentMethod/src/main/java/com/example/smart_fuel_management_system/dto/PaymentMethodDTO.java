@@ -9,6 +9,5 @@ public record PaymentMethodDTO(
         PaymentMethodType paymentMethodType,
         String cardHolderName,
         String maskedNumber,
-        int priority,
         boolean isDefault
 ) {}

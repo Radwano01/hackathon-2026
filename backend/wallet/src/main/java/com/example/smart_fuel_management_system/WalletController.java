@@ -23,6 +23,7 @@ public class WalletController {
         this.walletService = walletService;
     }
 
+
     /**
      * Get authenticated user's wallet details
      * GET /api/v1/wallet
@@ -57,49 +58,4 @@ public class WalletController {
         walletService.deactivateWallet(userId);
         return ResponseEntity.noContent().build();
     }
-<<<<<<< HEAD
-
-    //admin page
-    @PatchMapping("/activate")
-    public ResponseEntity<Void> activate(Authentication authentication) {
-        UUID userId = UUID.fromString(authentication.getName());
-        walletService.activateWallet(userId);
-        return ResponseEntity.noContent().build();
-    }
-
-    //admin page
-    @PatchMapping("/block")
-    public ResponseEntity<Void> block(Authentication authentication) {
-        UUID userId = UUID.fromString(authentication.getName());
-        walletService.blockWallet(userId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/bonus")
-    public ResponseEntity<Void> bonus(@RequestBody WalletBonusDTO walletBonusDTO
-    ) {
-        walletService.applyBonus(walletBonusDTO);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/internal/{userId}")
-    public ResponseEntity<Void> internalCreateWallet(@PathVariable UUID userId) {
-        walletService.createWallet(userId);
-        return ResponseEntity.status(201).build();
-    }
-
-    @GetMapping("/internal/{userId}")
-    public ResponseEntity<WalletDTO> internalGetWallet(@PathVariable UUID userId) {
-        return ResponseEntity.ok(walletService.getWalletDetails(userId));
-    }
-
-    @PostMapping("/internal/{userId}/update")
-    public ResponseEntity<Void> internalUpdate(
-            @PathVariable UUID userId,
-            @RequestBody WalletUpdateDTO walletUpdateDTO) {
-        walletService.updateBalance(userId, walletUpdateDTO);
-        return ResponseEntity.ok().build();
-    }
-=======
->>>>>>> a114d8b (readme added)
 }

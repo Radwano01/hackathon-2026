@@ -20,11 +20,6 @@ public interface WalletService {
      */
     WalletDTO getWalletDetails(UUID userId);
 
-<<<<<<< HEAD
-    void updateBalance(UUID userId, WalletUpdateDTO request);
-
-
-=======
     /**
      * User updates their own wallet balance (top-up, withdraw, refund)
      */
@@ -57,6 +52,7 @@ public interface WalletService {
     /**
      * Service-to-service: Apply bonus/promotional credit
      */
->>>>>>> a114d8b (readme added)
     void applyBonus(WalletBonusDTO request);
+
+    void deleteWallet(UUID userId);
 }

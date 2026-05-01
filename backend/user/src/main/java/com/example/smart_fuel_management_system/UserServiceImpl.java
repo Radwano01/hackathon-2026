@@ -5,9 +5,15 @@ import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 
@@ -42,49 +48,69 @@ public class UserServiceImpl implements UserService{
         );
 
         User savedUser = userRepository.save(user);
+        UUID userId = savedUser.getId();
 
-<<<<<<< HEAD
-        restTemplate.postForObject(
-                "http://WALLET/api/v1/wallet/internal/{userId}",
-                new CreateWalletRequest(),
-                Void.class,
-                savedUser.getId()
-        );
-=======
+        boolean walletCreated = false;
+        boolean authCreated = false;
+
         try {
+            // =========================
+            // 1. CREATE WALLET
+            // =========================
             restTemplate.postForObject(
                     "http://WALLET/internal/wallet/{userId}",
-                    savedUser.getId(),
+                    null,
                     Void.class,
-                    savedUser.getId()
+                    user.getId()
             );
->>>>>>> a114d8b (readme added)
+            walletCreated = true;
 
+            // =========================
+            // 2. CREATE AUTH
+            // =========================
             RegisterAuthDTO authRequest = new RegisterAuthDTO(
-                    savedUser.getId(),
+                    userId,
                     registerDTO.password(),
                     "USER"
             );
 
-            // Use internal endpoint to bypass JWT filter issues with service-to-service calls
             restTemplate.postForObject(
                     "http://AUTH/api/v1/auth/register",
                     authRequest,
                     Void.class
             );
-        }catch (Exception e) {
+            authCreated = true;
 
-            userRepository.deleteById(savedUser.getId());
+        } catch (Exception e) {
 
-            throw new RuntimeException("Registration failed. Rolled back user.", e);
+            try {
+                if (walletCreated) {
+                    restTemplate.delete(
+                            "http://WALLET/internal/wallet/" + userId
+                    );
+                }
+            } catch (Exception ignored) {}
+
+            userRepository.deleteById(userId);
+
+            throw new RuntimeException("Registration failed. Rolled back.", e);
         }
     }
 
     @Override
     public AuthDTO login(LoginDTO loginDTO) {
+
+        User user = userRepository.findByPhoneNumber(loginDTO.phoneNumber())
+                .orElseThrow(() -> new EntityNotFoundException("this phone number is not found"));
+
+        LoginAuthDTO request = new LoginAuthDTO(
+                user.getId(),
+                loginDTO.password()
+        );
+
         AuthDTO response = restTemplate.postForObject(
                 "http://AUTH/api/v1/auth/login",
-                loginDTO,
+                request,
                 AuthDTO.class
         );
 
@@ -92,18 +118,40 @@ public class UserServiceImpl implements UserService{
             throw new IllegalStateException("Auth service unavailable");
         }
 
-        return response;
+        return new AuthDTO(
+                user.getId(),
+                response.token(),
+                response.refreshToken()
+        );
     }
 
     @Override
-    public UserDTO getUser(UUID userId) {
-        User user = findUserById(userId);
+    public UserDTO getUser(Authentication authentication) {
 
-        WalletDTO walletDTO = restTemplate.getForObject(
-                "http://WALLET/api/v1/" + user.getId() + "/wallet",
+        UUID userId = UUID.fromString(authentication.getName());
+
+        String token = (authentication.getCredentials() != null)
+                ? authentication.getCredentials().toString()
+                : null;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + token);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<WalletDTO> response = restTemplate.exchange(
+                "http://WALLET/api/v1/wallet",
+                HttpMethod.GET,
+                entity,
                 WalletDTO.class
         );
 
+        WalletDTO walletDTO = response.getBody();
+
+        // 4. Get user from DB using userId (NOT token)
+        User user = findUserById(userId);
+
+        // 5. Build response
         return UserDTO.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
@@ -144,7 +192,7 @@ public class UserServiceImpl implements UserService{
     @Transactional
     public void updatePassword(UUID userId, UpdatePasswordDTO passwordDTO) {
         User user = findUserById(userId);
-        if(user.getPassword().equals(passwordDTO.oldPassword())){
+        if(!user.getPassword().equals(passwordDTO.oldPassword())){
             throw new IllegalArgumentException("Old password is incorrect");
         }
         if(user.getPassword().equals(passwordDTO.newPassword())){
@@ -161,24 +209,30 @@ public class UserServiceImpl implements UserService{
                 .orElseThrow(()-> new EntityNotFoundException("The email you entered is not valid in our database"));
 
         restTemplate.postForObject(
-                "http://PASSWORDRESETTOKEN/api/v1/password-reset-token/create/" + user.getId()
-                        + "?email=" + user.getEmail(),
+                "http://PASSWORDRESETTOKEN/api/v1/password-reset-token/create/{userId}",
                 null,
-                Void.class
+                Void.class,
+                user.getId()
         );
     }
 
     @Override
-    public void resetPassword(UUID userId, String newPassword, String token) {
-        restTemplate.postForObject(
+    public void resetPassword(String token, String newPassword) {
+
+        // validate + get userId from token service
+        UUID userId = restTemplate.postForObject(
                 "http://PASSWORDRESETTOKEN/api/v1/password-reset-token/validate?token=" + token,
                 null,
-                Void.class
+                UUID.class
         );
+
+        if (userId == null) {
+            throw new RuntimeException("Invalid or expired token");
+        }
+
         User user = findUserById(userId);
 
         user.setPassword(newPassword);
-
         userRepository.save(user);
     }
 

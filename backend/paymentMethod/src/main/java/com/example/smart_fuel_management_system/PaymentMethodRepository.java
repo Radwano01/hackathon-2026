@@ -9,7 +9,9 @@ public interface PaymentMethodRepository extends JpaRepository<PaymentMethod, UU
 
     List<PaymentMethod> findByUserId(UUID userId);
 
+    PaymentMethod findByUserIdAndIsDefaultTrue(UUID userId);
+
     void deleteByIdAndUserId(UUID id, UUID userId);
 
-    PaymentMethod findByUserIdAndIsDefaultTrue(UUID userId);
+    boolean existsByCardNumberMasked(String cardNumberMasked);
 }

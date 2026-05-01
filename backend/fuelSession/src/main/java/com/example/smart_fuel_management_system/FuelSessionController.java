@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/internal/fuel-sessions")
+@RequestMapping("/api/v1/fuel-sessions/internal")
 public class FuelSessionController {
 
     private final FuelSessionService fuelSessionService;

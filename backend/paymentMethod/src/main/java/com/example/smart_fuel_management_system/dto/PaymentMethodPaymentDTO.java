@@ -7,7 +7,6 @@ import java.util.UUID;
 public record PaymentMethodPaymentDTO(
         UUID id,
         PaymentMethodType paymentMethodType,
-        int priority,
-        UUID cardToken,
+        String cardToken,
         boolean isDefault
 ) {}

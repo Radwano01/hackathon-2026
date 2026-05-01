@@ -17,6 +17,7 @@ public class AuthUser {
     @Id
     private UUID id = UUID.randomUUID();
 
+    private UUID userId;
     private String password;
     private String role;
 }

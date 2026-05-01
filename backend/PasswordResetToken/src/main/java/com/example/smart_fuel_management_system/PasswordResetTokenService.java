@@ -28,7 +28,7 @@ public class PasswordResetTokenService {
     public void createPasswordResetToken(UUID userId) {
 
         UserResponse user = restTemplate.getForObject(
-                "http://USER/api/v1/users/{userId}",
+                "http://USER/internal/users/{userId}",
                 UserResponse.class,
                 userId
         );
@@ -53,12 +53,12 @@ public class PasswordResetTokenService {
 
     private void sendMessage(String email, String fullName, String token){
         SimpleMailMessage message = new SimpleMailMessage();
-        String link = "http://localhost:3000/reset-password?token=" + token;
+        String link = "http://localhost:3000/reset-password/confirm?token=" + token;
         message.setTo(email);
         message.setSubject("🔐 Reset Your Password");
 
         String emailContent =
-                "Hello,\n\n" + fullName
+                "Hello, " +fullName + "\n\n"
                         + "We received a request to reset your password.\n\n"
                         + "Click the link below to reset it:\n"
                         + link + "\n\n"
@@ -72,14 +72,21 @@ public class PasswordResetTokenService {
         mailSender.send(message);
     }
 
-    public void validateToken(String token) {
-        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
-                .orElseThrow(()-> new EntityNotFoundException("the token is expired or not found in our database"));
+    public UUID validateToken(String token) {
 
-        if(resetToken.getExpireDate().isBefore(LocalDateTime.now())){
-            throw new RuntimeException("Invalid Token");
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "The token is expired or not found in our database"
+                ));
+
+        if (resetToken.getExpireDate().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Token expired");
         }
 
+        UUID userId = resetToken.getUserId();
+
         passwordResetTokenRepository.delete(resetToken);
+
+        return userId;
     }
 }

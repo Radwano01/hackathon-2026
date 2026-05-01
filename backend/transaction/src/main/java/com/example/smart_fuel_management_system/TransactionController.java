@@ -37,21 +37,4 @@ public class TransactionController {
                 transactionService.getById(transactionId)
         );
     }
-
-    @PostMapping("/internal/{userId}")
-    public ResponseEntity<TransactionResponse> internalCreateTransaction(
-            @PathVariable UUID userId,
-            @RequestBody TransactionDTO transactionDTO) {
-        return ResponseEntity.ok(
-                transactionService.create(userId, transactionDTO)
-        );
-    }
-
-    @PatchMapping("/internal/{transactionId}/status")
-    public ResponseEntity<Void> internalUpdateStatus(
-            @PathVariable UUID transactionId,
-            @RequestParam TransactionStatusType transactionStatusType) {
-        transactionService.update(transactionId, transactionStatusType);
-        return ResponseEntity.ok().build();
-    }
 }

@@ -18,22 +18,14 @@ public class PasswordResetTokenController {
         this.passwordResetTokenService = passwordResetTokenService;
     }
 
-    @PostMapping("/create")
-    public ResponseEntity<Void> sendToken(Authentication authentication){
-        UUID userId = UUID.fromString(authentication.getName());
+    @PostMapping("/create/{userId}")
+    public ResponseEntity<Void> sendToken(@PathVariable UUID userId){
         passwordResetTokenService.createPasswordResetToken(userId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/validate")
-    public ResponseEntity<Void> validateToken(@RequestParam("token") String token){
-        passwordResetTokenService.validateToken(token);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/internal/{userId}/create")
-    public ResponseEntity<Void> internalSendToken(@PathVariable UUID userId) {
-        passwordResetTokenService.createPasswordResetToken(userId);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<UUID> validateToken(@RequestParam("token") String token){
+        return ResponseEntity.ok(passwordResetTokenService.validateToken(token));
     }
 }

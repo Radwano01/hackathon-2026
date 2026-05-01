@@ -3,6 +3,7 @@ package com.example.smart_fuel_management_system;
 import com.example.smart_fuel_management_system.dto.AddCardDTO;
 import com.example.smart_fuel_management_system.dto.PaymentMethodDTO;
 import com.example.smart_fuel_management_system.dto.PaymentMethodPaymentDTO;
+import jakarta.persistence.EntityExistsException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,12 +19,22 @@ public class PaymentMethodServiceImpl implements PaymentMethodService {
     }
 
     @Override
-    public UUID addCard(UUID userId, AddCardDTO dto) {
+    public void addCard(UUID userId, AddCardDTO dto) {
 
-        PaymentMethod existingDefault = repository.findByUserIdAndIsDefaultTrue(userId);
+        if (dto.cardNumber().length() < 12) {
+            throw new IllegalArgumentException("Card number too short");
+        }
 
-        // must come from visa system but for now this fine
-        UUID cardToken = UUID.fromString("tok_" + UUID.randomUUID());
+        // FIXED: compare masked or token in real systems (not raw card)
+        if (repository.existsByCardNumberMasked(CardUtils.mask(dto.cardNumber()))) {
+            throw new EntityExistsException("This card already exists");
+        }
+
+        PaymentMethod existingDefault =
+                repository.findByUserIdAndIsDefaultTrue(userId);
+
+        String cardToken = "tok_" + UUID.randomUUID();
+
         PaymentMethod method = new PaymentMethod(
                 userId,
                 PaymentMethodType.CARD,
@@ -36,7 +47,7 @@ public class PaymentMethodServiceImpl implements PaymentMethodService {
         // first card becomes default
         method.setDefault(existingDefault == null);
 
-        return repository.save(method).getId();
+        repository.save(method);
     }
 
     @Override
@@ -48,7 +59,6 @@ public class PaymentMethodServiceImpl implements PaymentMethodService {
                         pm.getType(),
                         pm.getCardHolderName(),
                         pm.getCardNumberMasked(),
-                        pm.getPriority(),
                         pm.isDefault()
                 ))
                 .toList();
@@ -61,7 +71,6 @@ public class PaymentMethodServiceImpl implements PaymentMethodService {
                 .map(pm -> new PaymentMethodPaymentDTO(
                         pm.getId(),
                         pm.getType(),
-                        pm.getPriority(),
                         pm.getCardToken(),
                         pm.isDefault()
                 ))
@@ -83,19 +92,5 @@ public class PaymentMethodServiceImpl implements PaymentMethodService {
         }
 
         repository.saveAll(methods);
-    }
-
-    @Override
-    public void updatePriority(UUID userId, UUID methodId, int priority) {
-
-        PaymentMethod method = repository.findById(methodId)
-                .orElseThrow();
-
-        if (!method.getUserId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
-        }
-
-        method.setPriority(priority);
-        repository.save(method);
     }
 }

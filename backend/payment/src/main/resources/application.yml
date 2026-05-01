@@ -11,8 +11,4 @@ eureka:
       defaultZone: http://localhost:8761/eureka
 
 stripe:
-<<<<<<< HEAD
-  secret-key: ${stripe.key}
-=======
   secret-key: sk_test_
->>>>>>> a114d8b (readme added)

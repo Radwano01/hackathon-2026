@@ -18,4 +18,6 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
     Optional<Wallet> findByIdForUpdate(@Param("id") UUID id);
 
     Optional<Wallet> findByUserId(UUID userId);
+
+    void deleteByUserId(UUID userId);
 }

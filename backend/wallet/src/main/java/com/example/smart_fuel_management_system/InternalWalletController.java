@@ -14,7 +14,7 @@ import java.util.UUID;
  * No authentication required - for internal Eureka service calls only
  */
 @RestController
-@RequestMapping("/internal/wallet")
+@RequestMapping("/api/v1/wallet/internal")
 public class InternalWalletController {
 
     private final WalletService walletService;
@@ -63,6 +63,12 @@ public class InternalWalletController {
     @PostMapping("/bonus")
     public ResponseEntity<Void> applyBonus(@RequestBody WalletBonusDTO request) {
         walletService.applyBonus(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<Void> applyBonus(@PathVariable UUID userId) {
+        walletService.deleteWallet(userId);
         return ResponseEntity.ok().build();
     }
 }

@@ -52,11 +52,7 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new EntityNotFoundException("Transaction not found"));
 
-<<<<<<< HEAD
-
-=======
         transaction.setStatus(transactionStatusType);
->>>>>>> a114d8b (readme added)
         transactionRepository.save(transaction);
 
         //BONUS TRIGGER
@@ -100,11 +96,7 @@ public class TransactionServiceImpl implements TransactionService {
 
         // STATION INFO
         StationResponseDTO station = restTemplate.getForObject(
-<<<<<<< HEAD
-                "http://STATION/api/v1/stations/{id}/internal",
-=======
                 "http://STATION/internal/stations/{id}",
->>>>>>> a114d8b (readme added)
                 StationResponseDTO.class,
                 transaction.getReferenceId()
         );

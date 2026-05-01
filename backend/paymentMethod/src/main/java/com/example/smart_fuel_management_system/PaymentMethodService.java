@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface PaymentMethodService {
 
-    UUID addCard(UUID userId, AddCardDTO dto);
+    void addCard(UUID userId, AddCardDTO dto);
 
     List<PaymentMethodDTO> list(UUID userId);
 
@@ -18,6 +18,4 @@ public interface PaymentMethodService {
     void delete(UUID userId, UUID methodId);
 
     void setDefault(UUID userId, UUID methodId);
-
-    void updatePriority(UUID userId, UUID methodId, int priority);
 }

@@ -29,6 +29,7 @@ public class AuthServiceImpl implements AuthService {
 
         AuthUser user = new AuthUser();
         user.setId(request.userId());
+        user.setUserId(request.userId());
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setRole(request.role());
 
@@ -45,9 +46,10 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Invalid credentials");
         }
 
-        String token = jwtGenerator.generateToken(user.getId(), user.getRole());
+        String accessToken = jwtGenerator.generateToken(user.getId(), user.getRole());
+        String refreshToken = jwtGenerator.generateRefreshToken(user.getId());
 
-        return new AuthDTO(token, user.getId());
+        return new AuthDTO(accessToken, refreshToken);
     }
 
     @Override

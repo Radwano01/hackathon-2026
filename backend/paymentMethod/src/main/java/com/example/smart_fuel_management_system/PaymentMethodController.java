@@ -3,6 +3,7 @@ package com.example.smart_fuel_management_system;
 import com.example.smart_fuel_management_system.dto.AddCardDTO;
 import com.example.smart_fuel_management_system.dto.PaymentMethodDTO;
 import com.example.smart_fuel_management_system.dto.PaymentMethodPaymentDTO;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,43 +20,49 @@ public class PaymentMethodController {
         this.service = service;
     }
 
-    @PostMapping("/cards")
-    public UUID addCard(Authentication authentication,
-                        @RequestBody AddCardDTO dto) {
+    @PostMapping
+    public ResponseEntity<Void> addCard(
+            Authentication authentication,
+            @RequestBody AddCardDTO dto
+    ) {
         UUID userId = UUID.fromString(authentication.getName());
-        return service.addCard(userId, dto);
+        service.addCard(userId, dto);
+
+        return ResponseEntity.status(201).build(); // CREATED
     }
 
     @GetMapping
-    public List<PaymentMethodDTO> list(Authentication authentication) {
+    public ResponseEntity<List<PaymentMethodDTO>> list(Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return service.list(userId);
+        return ResponseEntity.ok(service.list(userId));
     }
 
     @GetMapping("/internal/{userId}")
-    public List<PaymentMethodPaymentDTO> internalList(@PathVariable UUID userId) {
-        return service.internalList(userId);
+    public ResponseEntity<List<PaymentMethodPaymentDTO>> internalList(
+            @PathVariable UUID userId
+    ) {
+        return ResponseEntity.ok(service.internalList(userId));
     }
 
     @DeleteMapping("/{methodId}")
-    public void delete(Authentication authentication,
-                       @PathVariable UUID methodId) {
+    public ResponseEntity<Void> delete(
+            Authentication authentication,
+            @PathVariable UUID methodId
+    ) {
         UUID userId = UUID.fromString(authentication.getName());
         service.delete(userId, methodId);
+
+        return ResponseEntity.noContent().build(); // 204
     }
 
     @PatchMapping("/{methodId}/default")
-    public void setDefault(Authentication authentication,
-                           @PathVariable UUID methodId) {
+    public ResponseEntity<Void> setDefault(
+            Authentication authentication,
+            @PathVariable UUID methodId
+    ) {
         UUID userId = UUID.fromString(authentication.getName());
         service.setDefault(userId, methodId);
-    }
 
-    @PatchMapping("/{methodId}/priority")
-    public void updatePriority(Authentication authentication,
-                               @PathVariable UUID methodId,
-                               @RequestParam int priority) {
-        UUID userId = UUID.fromString(authentication.getName());
-        service.updatePriority(userId, methodId, priority);
+        return ResponseEntity.noContent().build();
     }
 }

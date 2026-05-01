@@ -27,20 +27,21 @@ public class PaymentMethod {
     private String cardNumberMasked; // NEVER store full card
     private String expiryDate;
 
-    private UUID cardToken;
+    private String cardToken;
 
     private boolean isDefault;
 
-    private int priority; // 1- wallet, 2- selected visa
-
-    public PaymentMethod(UUID userId, PaymentMethodType paymentMethodType,
-                         String cardHolderName, UUID cardToken, String mask, String expireDate) {
+    public PaymentMethod(UUID userId,
+                         PaymentMethodType type,
+                         String cardHolderName,
+                         String cardToken,
+                         String cardNumberMasked,
+                         String expiryDate) {
         this.userId = userId;
-        this.type = paymentMethodType;
+        this.type = type;
         this.cardHolderName = cardHolderName;
         this.cardToken = cardToken;
-        this.cardNumberMasked = mask;
-        this.expiryDate = expireDate;
+        this.cardNumberMasked = cardNumberMasked;
+        this.expiryDate = expiryDate;
     }
-
 }

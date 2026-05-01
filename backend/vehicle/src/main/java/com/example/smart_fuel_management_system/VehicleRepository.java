@@ -21,10 +21,6 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
 
     Optional<Vehicle> findByPlateNumber(String plateNumber);
 
-<<<<<<< HEAD
-    Optional<Vehicle> findByUserIdAndVehicleId(UUID userId, UUID vehicleId);
-=======
     Optional<Vehicle> findByUserIdAndId(UUID userId, UUID vehicleId);
->>>>>>> a114d8b (readme added)
     Optional<Vehicle> findByRfidTag(String rfidTag);
 }

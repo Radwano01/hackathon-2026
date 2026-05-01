@@ -1,142 +1,108 @@
 # Wallet Service
 
-Manages user digital wallets, balance tracking, transactions, and bonus rewards system.
-
 ## Overview
 
-- **Port**: 8010
-- **Base Path**: `/api/v1/wallet`
-- **Service Name**: WALLET
-- **Database**: PostgreSQL (wallets table)
+The Wallet Service manages user wallet balances, transaction updates, bonus credits, and wallet lifecycle actions.
 
-## Features
+**Base Path:** `/api/v1/wallet`  
+**Service Type:** User-facing, internal, and admin endpoints
 
-✅ User wallet creation (on registration)  
-✅ Balance management (credits & debits)  
-✅ Bonus rewards system (5% cashback on transactions)  
-✅ Wallet activation/deactivation  
-✅ Admin wallet blocking  
-✅ Transaction history with types  
+## Current Endpoints
 
-## API Endpoints
+### User APIs
 
-### Protected (User)
+#### Get current wallet
+`GET /api/v1/wallet`
 
-```
-POST /api/v1/wallet
-  Response: { walletId }
-  
-GET /api/v1/wallet
-  Response: { balance, currency }
-  
-POST /api/v1/wallet/update
-  Request: { amount, type }  -- type: TOP_UP, WITHDRAW, REFUND, BONUS
-  Response: 200 OK
-  
-PATCH /api/v1/wallet/deactivate
-  Response: 204 No Content
+Returns the authenticated user's wallet.
+
+Response body:
+```json
+{
+  "balance": 125.50,
+  "currency": "USD",
+  "statusType": "ACTIVE"
+}
 ```
 
-### Admin
+#### Update wallet balance
+`POST /api/v1/wallet/update`
 
-```
-PATCH /api/v1/wallet/activate
-  Response: 204 No Content
-  
-PATCH /api/v1/wallet/block
-  Response: 204 No Content
-  
-POST /api/v1/wallet/bonus
-  Request: { userId, amount }
-  Response: 200 OK
+Request body:
+```json
+{
+  "amount": 50.00,
+  "type": "TOP_UP"
+}
 ```
 
-### Internal (Service-to-Service)
+`type` uses `TransactionType`: `TOP_UP`, `WITHDRAW`, `REFUND`, `BONUS`.
 
-```
-POST /internal/wallet/{userId}
-  Response: { walletId }
-  
-GET /internal/wallet/{userId}
-  Response: { balance, currency }
-  
-POST /internal/wallet/{userId}/update
-  Request: { amount, type }
-  Response: 200 OK
-```
+#### Deactivate wallet
+`PATCH /api/v1/wallet/deactivate`
 
-## Database Schema
+Returns `204 No Content`.
 
-```sql
-CREATE TABLE wallets (
-    id UUID PRIMARY KEY,
-    user_id UUID UNIQUE NOT NULL,
-    balance DECIMAL(15,2) DEFAULT 0.00,
-    currency VARCHAR(10) DEFAULT '$',
-    status VARCHAR(20),  -- ACTIVE, INACTIVE, BLOCKED
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-```
+### Admin APIs
 
-## Wallet Status
+#### Activate wallet
+`PATCH /api/v1/admin/wallet/{userId}/activate`
 
-- **ACTIVE** - Operational, can receive & spend
-- **INACTIVE** - User deactivated (still exists)
-- **BLOCKED** - Admin blocked (fraud/violation)
+#### Block wallet
+`PATCH /api/v1/admin/wallet/{userId}/block`
 
-## Transaction Types
+### Internal APIs
 
-- **TOP_UP** - Manual balance increase
-- **WITHDRAW** - Fuel purchase
-- **REFUND** - Transaction reversal
-- **BONUS** - Reward cashback (5% of fuel cost)
+#### Create wallet
+`POST /api/v1/wallet/internal/{userId}`
 
-## Bonus System
+Used by the User Service during registration.
 
-Automatically triggered after successful fuel transaction:
-```
-Bonus = Transaction Amount × 5%
-Example: €50 fuel → €2.50 bonus
+#### Get wallet by user ID
+`GET /api/v1/wallet/internal/{userId}`
+
+#### Update wallet by user ID
+`POST /api/v1/wallet/internal/{userId}/update`
+
+Request body:
+```json
+{
+  "amount": 50.00,
+  "type": "TOP_UP"
+}
 ```
 
-## Running
+#### Apply bonus credit
+`POST /api/v1/wallet/internal/bonus`
 
-```bash
-cd wallet
-mvn spring-boot:run
+Request body:
+```json
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "amount": 10.00
+}
 ```
 
-Server starts on `http://localhost:8010`
+#### Delete wallet
+`DELETE /api/v1/wallet/internal/{userId}`
 
-## Configuration
+## DTOs
 
-```yaml
-server:
-  port: 8005
-spring:
-  application:
-    name: WALLET
-  datasource:
-    url: jdbc:postgresql://localhost:5432/wallet_db
+### WalletDTO
+- `balance`
+- `currency`
+- `statusType`
 
-wallet:
-  bonus-percentage: 5  # 5% cashback
-  currency: "$"
-```
+### WalletUpdateDTO
+- `amount`
+- `type`
 
-## Integration
+### WalletBonusDTO
+- `userId`
+- `amount`
 
-- **User Service** - Auto-creates wallet on registration
-- **Payment Service** - Debits on fuel purchase
-- **Transaction Service** - Applies bonuses on SUCCESS
-- **Admin Dashboard** - Wallet management
+## Notes
 
-## Dependencies
-
-- Spring Web
-- Spring Data JPA
-- PostgreSQL Driver
-- Spring Security
-- Spring Cloud Eureka
+- The user-facing controller only exposes wallet read, update, and deactivate actions.
+- Wallet creation and bonus application are internal-service operations.
+- Admin activation and blocking are handled separately under `/api/v1/admin/wallet`.

@@ -31,6 +31,7 @@ public class WalletServiceImpl implements WalletService {
         return WalletDTO.builder()
                 .balance(wallet.getBalance())
                 .currency(wallet.getCurrency())
+                .statusType(wallet.getStatusType())
                 .build();
     }
 
@@ -86,8 +87,7 @@ public class WalletServiceImpl implements WalletService {
                 BigDecimal.ZERO,
                 "$",
                 StatusType.ACTIVE,
-                userId,
-                LocalDateTime.now()
+                userId
         );
         walletRepository.save(wallet);
     }
@@ -97,6 +97,11 @@ public class WalletServiceImpl implements WalletService {
         Wallet wallet = getWalletByUserId(request.userId());
         wallet.credit(request.amount());
         walletRepository.save(wallet);
+    }
+
+    @Override
+    public void deleteWallet(UUID userId) {
+        walletRepository.deleteByUserId(userId);
     }
 
     // ============== HELPER METHODS ==============

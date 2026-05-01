@@ -86,29 +86,4 @@ public class VehicleController {
                 vehicleService.validate(userId, vehicleId)
         );
     }
-
-    @GetMapping("/internal/{userId}")
-    public ResponseEntity<List<ListDTO>> internalListByUser(
-            @PathVariable UUID userId) {
-        return ResponseEntity.ok(
-                vehicleService.findAllByUserId(userId)
-        );
-    }
-
-    @GetMapping("/internal/{userId}/validate")
-    public ResponseEntity<VehicleValidationDTO> internalValidate(
-            @PathVariable UUID userId) {
-        return ResponseEntity.ok(
-                vehicleService.validateByUserId(userId)
-        );
-    }
-
-    @GetMapping("/internal/resolve")
-    public ResponseEntity<VehicleResponseDTO> internalResolve(
-            @RequestParam String rfidTag,
-            @RequestParam String plateNumber) {
-        return ResponseEntity.ok(
-                vehicleService.resolveVehicle(rfidTag, plateNumber)
-        );
-    }
 }

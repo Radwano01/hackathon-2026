@@ -36,6 +36,7 @@
         <module>payment</module>
         <module>paymentMethod</module>
         <module>api-gateway</module>
+        <module>PaymentPreference</module>
     </modules>
 
     <!-- SPRING CLOUD -->

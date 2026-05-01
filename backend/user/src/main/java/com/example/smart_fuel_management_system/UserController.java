@@ -3,6 +3,7 @@ package com.example.smart_fuel_management_system;
 import com.example.smart_fuel_management_system.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -20,31 +21,33 @@ public class UserController {
         return ResponseEntity.status(201).build();
     }
 
+
     @PostMapping("/login")
     public ResponseEntity<AuthDTO> login(@RequestBody LoginDTO request) {
         return ResponseEntity.ok(userService.login(request));
     }
 
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<UserDTO> getUser(@PathVariable UUID userId) {
-        return ResponseEntity.ok(userService.getUser(userId));
+    @GetMapping
+    public ResponseEntity<UserDTO> getUser(
+            Authentication authentication) {
+        return ResponseEntity.ok(userService.getUser(authentication));
     }
 
-    @PutMapping("/{userId}")
+    @PatchMapping
     public ResponseEntity<Void> updateUser(
-            @PathVariable UUID userId,
+            Authentication authentication,
             @RequestBody UpdateDTO request) {
-
+        UUID userId = UUID.fromString(authentication.getName());
         userService.updateUser(userId, request);
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping("/{userId}/password")
+    @PatchMapping("/password")
     public ResponseEntity<Void> updatePassword(
-            @PathVariable UUID userId,
+            Authentication authentication,
             @RequestBody UpdatePasswordDTO request) {
-
+        UUID userId = UUID.fromString(authentication.getName());
         userService.updatePassword(userId, request);
         return ResponseEntity.noContent().build();
     }
@@ -55,19 +58,12 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/{userId}/password-reset")
+    @PostMapping("/password-reset")
     public ResponseEntity<Void> resetPassword(
-            @PathVariable UUID userId,
             @RequestParam String token,
             @RequestParam String newPassword) {
 
-        userService.resetPassword(userId, newPassword, token);
+        userService.resetPassword(token, newPassword);
         return ResponseEntity.ok().build();
-    }
-
-
-    @GetMapping("/{userId}/internal")
-    public ResponseEntity<UserResponse> getUserResponse(@PathVariable UUID userId) {
-        return ResponseEntity.ok(userService.getUserResponse(userId));
     }
 }

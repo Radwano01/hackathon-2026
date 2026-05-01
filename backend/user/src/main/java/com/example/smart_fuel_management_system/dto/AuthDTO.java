@@ -1,5 +1,8 @@
 package com.example.smart_fuel_management_system.dto;
 
 
-public record AuthDTO(String token,
+import java.util.UUID;
+
+public record AuthDTO(UUID userId,
+                      String token,
                       String refreshToken){}

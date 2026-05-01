@@ -4,5 +4,5 @@ import java.util.UUID;
 
 public record AuthDTO(
         String token,
-        UUID userId
+        String refreshToken
 ) {}

@@ -6,10 +6,7 @@ import com.stripe.model.PaymentIntent;
 import com.stripe.param.PaymentIntentCreateParams;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
-<<<<<<< HEAD
-=======
 import org.springframework.http.HttpMethod;
->>>>>>> a114d8b (readme added)
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -42,7 +39,6 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public PaymentResponse pay(UUID userId, PaymentDTO dto) {
 
-        // 1. CREATE TRANSACTION (ONLY HERE)
         TransactionResponse tx = restTemplate.postForObject(
                 "http://TRANSACTION/api/v1/transactions/internal/" + userId,
                 new TransactionDTO(dto.amount(), dto.orderId()),
@@ -57,25 +53,9 @@ public class PaymentServiceImpl implements PaymentService {
 
         try {
 
-            // 2. GET PAYMENT METHODS
-<<<<<<< HEAD
-            PaymentMethodDTO[] methods = restTemplate.getForObject(
-                    "http://PAYMENT-METHOD/api/v1/payment-methods/internal/{userId}",
-                    PaymentMethodDTO[].class,
-                    userId
-            );
-
-            if (methods == null || methods.length == 0) {
-                throw new RuntimeException("No payment methods");
-            }
-
-            List<PaymentMethodDTO> sorted = Arrays.stream(methods)
-                    .sorted(Comparator.comparingInt(PaymentMethodDTO::priority))
-                    .toList();
-
-            // 3. TRY PAYMENT METHODS
-            for (PaymentMethodDTO method : sorted) {
-=======
+            // =========================
+            // 1. GET PAYMENT METHODS
+            // =========================
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> methods = restTemplate.getForObject(
                     "http://PAYMENT-METHOD/api/v1/payment-methods/internal/{userId}",
@@ -87,153 +67,143 @@ public class PaymentServiceImpl implements PaymentService {
                 throw new RuntimeException("No payment methods");
             }
 
-            List<Map<String, Object>> sorted = methods.stream()
-                    .sorted(Comparator.comparingInt(m -> (Integer) m.getOrDefault("priority", Integer.MAX_VALUE)))
-                    .toList();
+            // =========================
+            // 2. GET PREFERENCE SERVICE (EUREKA)
+            // =========================
+            PaymentPreferenceDTO preference = restTemplate.getForObject(
+                    "http://PAYMENT-PREFERENCE-SERVICE/api/v1/payment-preferences/{userId}",
+                    PaymentPreferenceDTO.class,
+                    userId
+            );
 
-            // 3. TRY PAYMENT METHODS
-            for (Map<String, Object> method : sorted) {
->>>>>>> a114d8b (readme added)
+            // =========================
+            // 3. DECISION ENGINE
+            // =========================
 
-                try {
-                    String methodType = (String) method.get("paymentMethodType");
-                    Object cardTokenObj = method.get("cardToken");
+            if (preference != null && preference.preferredType() == PreferredType.WALLET) {
 
-                    // WALLET
-<<<<<<< HEAD
-                    if (method.paymentMethodType() == PaymentMethodType.WALLET) {
-=======
-                    if ("WALLET".equals(methodType)) {
->>>>>>> a114d8b (readme added)
-
-                        restTemplate.postForObject(
-                                "http://WALLET/api/v1/wallet/internal/{userId}/update",
-                                new WalletUpdateDTO(dto.amount(), TransactionType.WITHDRAW),
-                                Void.class,
-                                userId
-                        );
-
-                        paid = true;
-                        break;
-                    }
-
-                    // STRIPE CARD
-<<<<<<< HEAD
-                    if (method.paymentMethodType() == PaymentMethodType.CARD) {
-=======
-                    if ("CARD".equals(methodType)) {
->>>>>>> a114d8b (readme added)
-
-                        if (cardTokenObj == null) {
-                            throw new RuntimeException("Missing card token");
-                        }
-
-                        boolean success = chargeWithStripe(
-<<<<<<< HEAD
-                                method.cardToken().toString(),
-=======
-                                cardTokenObj.toString(),
->>>>>>> a114d8b (readme added)
-                                dto.amount()
-                        );
-
-                        if (!success) {
-                            throw new RuntimeException("Stripe declined");
-                        }
-
-                        paid = true;
-                        break;
-                    }
-
-                } catch (Exception e) {
-<<<<<<< HEAD
-                    System.out.println("Failed method: " + method.id() + " " + e.getMessage());
-=======
-                    System.out.println("Failed method: " + method.get("id") + " " + e.getMessage());
->>>>>>> a114d8b (readme added)
-                }
+                paid = payWithWallet(userId, dto.amount());
             }
 
-            // 4. UPDATE TRANSACTION STATUS
-            if (paid) {
+            else if (preference != null && preference.preferredType() == PreferredType.CARD) {
 
-<<<<<<< HEAD
-                restTemplate.patchForObject(
-                        "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=SUCCESS",
-=======
-                restTemplate.exchange(
-                        "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=SUCCESS",
-                        HttpMethod.PATCH,
->>>>>>> a114d8b (readme added)
-                        null,
-                        Void.class,
-                        tx.id()
-                );
-
-                return new PaymentResponse(
-                        tx.id(),
-                        PaymentStatusType.SUCCESS,
-                        dto.amount()
-                );
-
-            } else {
-
-<<<<<<< HEAD
-                restTemplate.patchForObject(
-                        "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=FAILED",
-=======
-                restTemplate.exchange(
-                        "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=FAILED",
-                        HttpMethod.PATCH,
->>>>>>> a114d8b (readme added)
-                        null,
-                        Void.class,
-                        tx.id()
-                );
-
-                throw new RuntimeException("All payment methods failed");
+                paid = payWithSpecificCard(methods, preference.preferredCardId(), dto.amount());
             }
+
+            else {
+
+                paid = fallbackPayment(methods, dto.amount());
+            }
+
+            // =========================
+            // 4. UPDATE TRANSACTION
+            // =========================
+            updateTransaction(tx.id(), paid);
+
+            if (!paid) {
+                throw new RuntimeException("Payment failed");
+            }
+
+            return new PaymentResponse(
+                    tx.id(),
+                    PaymentStatusType.SUCCESS,
+                    dto.amount()
+            );
 
         } catch (Exception e) {
 
-<<<<<<< HEAD
-            restTemplate.patchForObject(
-                    "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=FAILED",
-=======
-            restTemplate.exchange(
-                    "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=FAILED",
-                    HttpMethod.PATCH,
->>>>>>> a114d8b (readme added)
-                    null,
-                    Void.class,
-                    tx.id()
-            );
-
+            updateTransaction(tx.id(), false);
             throw e;
         }
     }
 
-    private boolean chargeWithStripe(String paymentMethodId, BigDecimal amount) {
-<<<<<<< HEAD
+    // =========================
+    // WALLET PAYMENT
+    // =========================
+    private boolean payWithWallet(UUID userId, BigDecimal amount) {
 
         try {
-            PaymentIntentCreateParams params =
-                    PaymentIntentCreateParams.builder()
-                            .setAmount(amount.multiply(BigDecimal.valueOf(100)).longValue())
-                            .setCurrency("usd")
-                            .setPaymentMethod(paymentMethodId)
-                            .setConfirm(true)
-                            .build();
-
-            PaymentIntent intent = PaymentIntent.create(params);
-
-            return "succeeded".equals(intent.getStatus());
-
+            restTemplate.postForObject(
+                    "http://WALLET/api/v1/wallet/internal/{userId}/update",
+                    new WalletUpdateDTO(amount, TransactionType.WITHDRAW),
+                    Void.class,
+                    userId
+            );
+            return true;
         } catch (Exception e) {
-            System.out.println("Stripe error: " + e.getMessage());
+            System.out.println("Wallet payment failed: " + e.getMessage());
             return false;
         }
-=======
+    }
+
+    // =========================
+    // CARD PAYMENT (SPECIFIC)
+    // =========================
+    private boolean payWithSpecificCard(List<Map<String, Object>> methods,
+                                        UUID cardId,
+                                        BigDecimal amount) {
+
+        try {
+            for (Map<String, Object> method : methods) {
+
+                if (cardId.toString().equals(String.valueOf(method.get("id")))) {
+
+                    String token = (String) method.get("cardToken");
+
+                    return chargeWithStripe(token, amount);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Card payment failed: " + e.getMessage());
+        }
+
+        return false;
+    }
+
+    // =========================
+    // FALLBACK PAYMENT FLOW
+    // =========================
+    private boolean fallbackPayment(List<Map<String, Object>> methods,
+                                    BigDecimal amount) {
+
+        List<Map<String, Object>> sorted = methods.stream()
+                .sorted(Comparator.comparingInt(
+                        m -> (Integer) m.getOrDefault("priority", Integer.MAX_VALUE)
+                ))
+                .toList();
+
+        for (Map<String, Object> method : sorted) {
+
+            try {
+                String type = (String) method.get("paymentMethodType");
+
+                if ("WALLET".equals(type)) {
+                    if (payWithWallet(UUID.fromString((String) method.get("userId")), amount)) {
+                        return true;
+                    }
+                }
+
+                if ("CARD".equals(type)) {
+
+                    String token = (String) method.get("cardToken");
+
+                    if (token != null && chargeWithStripe(token, amount)) {
+                        return true;
+                    }
+                }
+
+            } catch (Exception e) {
+                System.out.println("Fallback method failed: " + e.getMessage());
+            }
+        }
+
+        return false;
+    }
+
+    // =========================
+    // STRIPE CHARGE
+    // =========================
+    private boolean chargeWithStripe(String paymentMethodId, BigDecimal amount) {
 
         try {
             PaymentIntentCreateParams params =
@@ -254,6 +224,25 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    // =========================
+    // TRANSACTION UPDATE
+    // =========================
+    private void updateTransaction(UUID txId, boolean success) {
+
+        String status = success ? "SUCCESS" : "FAILED";
+
+        restTemplate.exchange(
+                "http://TRANSACTION/api/v1/transactions/internal/{id}/status?status=" + status,
+                HttpMethod.PATCH,
+                null,
+                Void.class,
+                txId
+        );
+    }
+
+    // =========================
+    // ELIGIBILITY CHECK
+    // =========================
     @Override
     public PaymentEligibilityResponse checkEligibility(UUID userId, BigDecimal estimatedAmount) {
 
@@ -264,36 +253,13 @@ public class PaymentServiceImpl implements PaymentService {
         );
 
         if (methods == null || methods.length == 0) {
-            return new PaymentEligibilityResponse(
-                    false,
-                    "No payment methods found"
-            );
+            return new PaymentEligibilityResponse(false, "No payment methods found");
         }
 
-        boolean hasValidMethod = Arrays.stream(methods)
-                .anyMatch(method -> {
+        boolean hasValid = Arrays.stream(methods)
+                .anyMatch(m -> m.paymentMethodType() == PaymentMethodType.WALLET
+                        || m.cardToken() != null);
 
-                    PaymentMethodType type = method.paymentMethodType();
-
-                    if (type == PaymentMethodType.WALLET) {
-                        return true; // later you can check wallet balance here
-                    }
-
-                    if (type == PaymentMethodType.CARD) {
-                        return method.cardToken() != null;
-                    }
-
-                    return false;
-                });
-
-        if (!hasValidMethod) {
-            return new PaymentEligibilityResponse(
-                    false,
-                    "No valid payment method available"
-            );
-        }
-
-        return new PaymentEligibilityResponse(true, "OK");
->>>>>>> a114d8b (readme added)
+        return new PaymentEligibilityResponse(hasValid, hasValid ? "OK" : "No valid method");
     }
 }

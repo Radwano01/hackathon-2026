@@ -1,144 +1,132 @@
 # Vehicle Service
 
-Manages vehicle registration, RFID tracking, and vehicle status for fuel consumption tracking.
-
 ## Overview
 
-- **Port**: 8090
-- **Base Path**: `/api/v1/vehicles`
-- **Service Name**: VEHICLE
-- **Database**: PostgreSQL (vehicles table)
+The Vehicle Service manages vehicle registration, updates, validation, and admin lifecycle actions.
 
-## Features
+**Base Path:** `/api/v1/vehicles`  
+**Service Type:** User-facing, internal, and admin endpoints
 
-✅ Vehicle registration (car details, fuel type)  
-✅ RFID tag assignment for identification  
-✅ Vehicle activation/deactivation  
-✅ Vehicle validation for fuel sessions  
-✅ Plate number & RFID resolution  
-✅ Admin vehicle status management  
+## Current Endpoints
 
-## API Endpoints
+### User APIs
 
-### Public (No Auth)
+#### Register a vehicle
+`POST /api/v1/vehicles`
 
-```
-GET /api/v1/vehicles/city/{city}
-  Response: List of vehicles in city
-```
-
-### Protected (User)
-
-```
-POST /api/v1/vehicles
-  Request: { plateNumber, brand, model, fuelType }
-  Response: { vehicleId }
-  
-GET /api/v1/vehicles
-  Response: List of user's vehicles
-  
-GET /api/v1/vehicles/{vehicleId}
-  Response: { id, plateNumber, brand, model, fuelType, status }
-  
-PATCH /api/v1/vehicles/{vehicleId}
-  Request: { brand, model, fuelType }
-  Response: 204 No Content
-  
-PATCH /api/v1/vehicles/{vehicleId}/deactivate
-  Response: 204 No Content
-  
-GET /api/v1/vehicles/{vehicleId}/validate
-  Response: { id, status, fuelType }
+Request body:
+```json
+{
+  "plateNumber": "ABC-1234",
+  "brand": "Toyota",
+  "model": "Corolla",
+  "fuelType": "PETROL"
+}
 ```
 
-### Admin
+Returns `201 Created` with the new vehicle ID.
 
-```
-PATCH /api/v1/admin/vehicles/{vehicleId}/status
-  Query: ?status=ACTIVE|INACTIVE|SUSPENDED
-  Response: 204 No Content
-  
-PATCH /api/v1/admin/vehicles/{plateNumber}/rfid
-  Query: ?rfidTag=<tag>
-  Response: 204 No Content
-  
-DELETE /api/v1/admin/vehicles/{vehicleId}
-  Response: 204 No Content
-  
-GET /api/v1/admin/vehicles/plate/{plateNumber}
-  Response: { id, plateNumber, brand, model, rfidTag, status }
-```
+#### List current user's vehicles
+`GET /api/v1/vehicles`
 
-### Internal (Service-to-Service)
-
-```
-GET /internal/vehicles/{userId}
-  Response: List of user's vehicles
-  
-GET /internal/vehicles/{userId}/validate
-  Response: { id, status, fuelType }
-  
-GET /internal/vehicles/resolve?rfidTag=<tag>&plateNumber=<plate>
-  Response: { vehicleId, userId }
+Response body:
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "brand": "Toyota",
+    "model": "Corolla",
+    "status": "ACTIVE"
+  }
+]
 ```
 
-## Database Schema
+#### Get vehicle by ID
+`GET /api/v1/vehicles/{vehicleId}`
 
-```sql
-CREATE TABLE vehicles (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL,
-    plate_number VARCHAR(20) UNIQUE NOT NULL,
-    brand VARCHAR(100),
-    model VARCHAR(100),
-    fuel_type VARCHAR(50),
-    rfid_tag VARCHAR(50) UNIQUE,
-    status VARCHAR(20),  -- ACTIVE, INACTIVE, SUSPENDED
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
+#### Update vehicle
+`PATCH /api/v1/vehicles/{vehicleId}`
+
+Request body:
+```json
+{
+  "brand": "Toyota",
+  "model": "Corolla Cross",
+  "fuelType": "PETROL"
+}
 ```
 
-## Vehicle Status
+#### Deactivate vehicle
+`PATCH /api/v1/vehicles/{vehicleId}/deactivate`
 
-- **ACTIVE** - Ready for fuel sessions
-- **INACTIVE** - Deactivated by user
-- **SUSPENDED** - Admin suspended (violation/fraud)
+#### Validate vehicle
+`GET /api/v1/vehicles/{vehicleId}/validate`
 
-## RFID Assignment
+### Admin APIs
 
-RFID tags must be unique. Once assigned, cannot be reassigned.
+#### Update vehicle status
+`PATCH /api/v1/admin/vehicles/{vehicleId}/status?status=ACTIVE`
 
-```
-POST /api/v1/admin/vehicles/ABC-1234/rfid?rfidTag=RFID-001
-```
+#### Assign RFID
+`PATCH /api/v1/admin/vehicles/{plateNumber}/rfid?rfidTag=RFID-001`
 
-## Running
+#### Delete vehicle
+`DELETE /api/v1/admin/vehicles/{vehicleId}`
 
-```bash
-cd vehicle
-mvn spring-boot:run
-```
+#### Find by plate number
+`GET /api/v1/admin/vehicles/plate/{plateNumber}`
 
-Server starts on `http://localhost:8090`
+### Internal APIs
 
-## Configuration
+#### List user vehicles
+`GET /api/v1/vehicles/internal/{userId}`
 
-```yaml
-server:
-  port: 8003
-spring:
-  application:
-    name: VEHICLE
-  datasource:
-    url: jdbc:postgresql://localhost:5432/vehicle_db
-```
+#### Validate by user ID
+`GET /api/v1/vehicles/internal/{userId}/validate`
 
-## Dependencies
+#### Resolve vehicle by RFID and plate number
+`GET /api/v1/vehicles/internal/resolve?rfidTag=RFID-001&plateNumber=ABC-1234`
 
-- Spring Web
-- Spring Data JPA
-- PostgreSQL Driver
-- Spring Security
-- Spring Cloud Eureka
+## DTOs
+
+### AddDTO
+- `plateNumber`
+- `brand`
+- `model`
+- `fuelType`
+
+### UpdateDTO
+- `brand`
+- `model`
+- `fuelType`
+
+### ListDTO
+- `id`
+- `brand`
+- `model`
+- `status`
+
+### VehicleDTO
+- `id`
+- `plateNumber`
+- `brand`
+- `model`
+- `fuelType`
+- `status`
+- `createdAt`
+- `updatedAt`
+
+### VehicleValidationDTO
+- `id`
+- `status`
+- `fuelType`
+
+### VehicleResponseDTO
+- `userId`
+- `vehicleId`
+
+## Notes
+
+- The current controller does not expose a public city lookup endpoint.
+- Public vehicle actions are authenticated and tied to the current user.
+- Admin operations are isolated under `/api/v1/admin/vehicles`.

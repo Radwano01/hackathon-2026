@@ -33,12 +33,12 @@ public class Wallet {
     private LocalDateTime createdAt;
 
     public Wallet(BigDecimal balance, String currency, StatusType statusType,
-                  UUID usedId, LocalDateTime createdAt) {
+                  UUID usedId) {
         this.balance = balance;
         this.currency = currency;
         this.statusType = statusType;
         this.userId = usedId;
-        this.createdAt = createdAt;
+        this.createdAt = LocalDateTime.now();
     }
 
     public void credit(BigDecimal amount) {

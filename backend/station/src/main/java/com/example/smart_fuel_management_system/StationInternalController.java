@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/internal/stations")
+@RequestMapping("/api/v1/stations/internal")
 public class StationInternalController {
 
     private final StationService stationService;
